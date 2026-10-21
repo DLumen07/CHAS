@@ -1,0 +1,14 @@
+/* Type-checking for the seed, which straddles both packages.
+
+   Same strictness, no rootDir and no emit - the seed is never compiled, only
+   run through tsx. Kept as its own file so `npm run build` cannot accidentally
+   start pulling the entire front-end into the server's dist/. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "outDir": null
+  },
+  "include": ["prisma/**/*.ts", "desktop.ts", "sample-learners.ts", "samples.ts","../src/data/**/*.ts", "../src/lib/nutrition.ts"]
+}

@@ -1,0 +1,37 @@
+# npm audit report
+
+deepmerge-ts  <8.0.0
+Severity: high
+DeepmergeTS has stack exhaustion when merging recursive object graphs - https://github.com/advisories/GHSA-ggr8-5vv4-36mx
+fix available via `npm audit fix`
+node_modules/deepmerge-ts
+  @prisma/config  6.13.0-dev.1 - 7.10.0 || 8.1.0-dev.1 - 8.1.0-dev.4
+  Depends on vulnerable versions of deepmerge-ts
+  node_modules/@prisma/config
+    prisma  6.13.0-dev.1 - 7.10.0 || 8.0.0-rc.3 - 8.1.0-dev.4
+    Depends on vulnerable versions of @prisma/config
+    node_modules/prisma
+
+proxy-addr  1.1.0 - 2.0.7
+Severity: critical
+proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet - https://github.com/advisories/GHSA-jqcg-44mw-7w3h
+fix available via `npm audit fix`
+node_modules/proxy-addr
+
+qs  2.2.5 - 6.15.3
+Severity: moderate
+qs array-limit bypass via bracket-key comma parsing - https://github.com/advisories/GHSA-x5fp-wj9c-mxmx
+qs: Denial of Service via Attacker Controlled isBuffer - https://github.com/advisories/GHSA-4mjr-xmp4-gh2g
+fix available via `npm audit fix`
+node_modules/qs
+  body-parser  1.20.5 - 1.20.6
+  Depends on vulnerable versions of qs
+  node_modules/body-parser
+  express  4.22.2
+  Depends on vulnerable versions of qs
+  node_modules/express
+
+7 vulnerabilities (3 moderate, 3 high, 1 critical)
+
+To address all issues, run:
+  npm audit fix

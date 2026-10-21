@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    /* import.meta.env, and the module declarations for asset imports. */
+    "types": ["vite/client"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    /* `@/` is the src root. Added alongside the Radix primitives: the shared
+       UI now sits two or three directories away from the screens using it,
+       and "../../components/ui" is a path that breaks quietly when a file
+       moves. Vite is given the same alias in vite.config.ts - both have to
+       agree, or the editor and the build disagree about what resolves. */
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  },
+  "include": ["src"]
+}

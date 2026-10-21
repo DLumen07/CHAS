@@ -1,0 +1,35 @@
+# Postgres for local development.
+#
+# The app is deployed against a managed database; this exists so `npm run
+# db:migrate` has something to talk to on a laptop without installing Postgres
+# system-wide.
+#
+# NOT a production configuration. The credentials are in plain text below
+# because they guard a container that only listens on localhost and holds
+# generated sample data. A deployment gets its DATABASE_URL from the host.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chas
+      POSTGRES_PASSWORD: chas
+      POSTGRES_DB: chas
+    ports:
+      # 5432 on the host. Change the left side if something else already has it.
+      - '5432:5432'
+    volumes:
+      - chas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `prisma migrate` run against a container that is up but not yet
+      # accepting connections fails with a confusing timeout, so compose is
+      # told how to tell the difference.
+      test: ['CMD-SHELL', 'pg_isready -U chas -d chas']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  chas-pgdata:

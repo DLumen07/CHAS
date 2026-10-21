@@ -1,0 +1,24 @@
+Data-at-rest check on the test copy (sample learners only)
+Database folder: <test data dir>/pgdata
+
+1) Sample learner surname 'Alvarez' found as plain text in these database files:
+<data>/pgdata/base/16384/16454
+<data>/pgdata/base/16384/16523
+
+2) settings.json beside the database holds these secrets in plain text (values redacted):
+    pgPassword = 2c13...(48 chars)
+    sessionSecret = 61f8...(64 chars)
+    pgPort = 54329
+    apiPort = 47810
+
+3) Automatic backups folder:
+   (none yet - made when CHAS closes)
+
+IdentityReference              FileSystemRights IsInherited
+-----------------              ---------------- -----------
+NT AUTHORITY\SYSTEM                 FullControl        True
+BUILTIN\Administrators              FullControl        True
+LAPTOP-70VVQ5FL\daren de lumen      FullControl        True
+
+
+

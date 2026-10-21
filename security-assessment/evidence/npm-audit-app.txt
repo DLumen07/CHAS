@@ -1,0 +1,195 @@
+# npm audit report
+
+@xmldom/xmldom  <=0.8.14
+Severity: high
+xmldom: XML fragment injection via invalid EntityReference.nodeName during requireWellFormed serialization - https://github.com/advisories/GHSA-6gmq-8vp8-gcm6
+xmldom: Processing Instruction Target Injection Bypasses requireWellFormed - https://github.com/advisories/GHSA-c7q8-3ch8-vqpv
+xmldom: DocType `name` Injection Bypasses requireWellFormed - https://github.com/advisories/GHSA-27p8-2357-5qqv
+xmldom: Parser silently accepts a not-well-formed end tag whose name is followed by a line break and trailing content - https://github.com/advisories/GHSA-6h8r-xr42-gp59
+xmldom: Quadratic-time attribute deduplication - https://github.com/advisories/GHSA-8344-3jmq-59r6
+xmldom: End-tag Whitespace-Trim Regex ReDoS — quadratic backtracking in the 0.8.x end-tag parser - https://github.com/advisories/GHSA-x4fp-j954-r2f4
+xmldom: Quadratic-memory consumption - https://github.com/advisories/GHSA-965w-775f-mr7g
+xmldom: Quadratic-time parsing via the malformed-input recovery path — `parseElementStartPart` re-scan and `normalize()` adjacent-text merge - https://github.com/advisories/GHSA-93r5-fhx6-vmg9
+fix available via `npm audit fix`
+node_modules/@xmldom/xmldom
+
+brace-expansion  <=1.1.20 || 2.0.0 - 2.1.6 || 4.0.0 - 5.0.11
+Severity: high
+brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service - https://github.com/advisories/GHSA-q2hr-2g5m-vwhr
+brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service - https://github.com/advisories/GHSA-q2hr-2g5m-vwhr
+brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service - https://github.com/advisories/GHSA-q2hr-2g5m-vwhr
+brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion - https://github.com/advisories/GHSA-qhr7-859c-m2p7
+brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion - https://github.com/advisories/GHSA-qhr7-859c-m2p7
+brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion - https://github.com/advisories/GHSA-qhr7-859c-m2p7
+brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion - https://github.com/advisories/GHSA-6j4f-fj2g-mc7p
+brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion - https://github.com/advisories/GHSA-6j4f-fj2g-mc7p
+brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion - https://github.com/advisories/GHSA-6j4f-fj2g-mc7p
+fix available via `npm audit fix`
+node_modules/@electron/asar/node_modules/brace-expansion
+node_modules/@electron/universal/node_modules/brace-expansion
+node_modules/brace-expansion
+node_modules/dir-compare/node_modules/brace-expansion
+node_modules/filelist/node_modules/brace-expansion
+node_modules/glob/node_modules/brace-expansion
+
+electron  <=41.10.5 || 42.0.0-alpha.1 - 42.3.3 || 43.0.0-alpha.1 - 43.0.0-beta.8
+Severity: high
+Depends on vulnerable versions of @electron/get
+Electron has ASAR Integrity Bypass via resource modification - https://github.com/advisories/GHSA-vmqv-hx8q-j7mg
+Electron: AppleScript injection in app.moveToApplicationsFolder on macOS - https://github.com/advisories/GHSA-5rqw-r77c-jp79
+Electron: Service worker can spoof executeJavaScript IPC replies - https://github.com/advisories/GHSA-xj5x-m3f3-5x3h
+Electron: Incorrect origin passed to permission request handler for iframe requests - https://github.com/advisories/GHSA-r5p7-gp4j-qhrx
+Electron: Out-of-bounds read in second-instance IPC on macOS and Linux - https://github.com/advisories/GHSA-3c8v-cfp5-9885
+Electron: nodeIntegrationInWorker not correctly scoped in shared renderer processes - https://github.com/advisories/GHSA-xwr5-m59h-vwqr
+Electron: Use-after-free in offscreen child window paint callback - https://github.com/advisories/GHSA-532v-xpq5-8h95
+Electron: Registry key path injection in app.setAsDefaultProtocolClient on Windows - https://github.com/advisories/GHSA-mwmh-mq4g-g6gr
+Electron: Use-after-free in download save dialog callback - https://github.com/advisories/GHSA-9w97-2464-8783
+Electron: Use-after-free in WebContents fullscreen, pointer-lock, and keyboard-lock permission callbacks - https://github.com/advisories/GHSA-8337-3p73-46f4
+Electron: Use-after-free in PowerMonitor on Windows and macOS - https://github.com/advisories/GHSA-jjp3-mq3x-295m
+Electron: Unquoted executable path in app.setLoginItemSettings on Windows - https://github.com/advisories/GHSA-jfqx-fxh3-c62j
+Electron: HTTP Response Header Injection in custom protocol handlers and webRequest - https://github.com/advisories/GHSA-4p4r-m79c-wq3v
+Electron: USB device selection not validated against filtered device list - https://github.com/advisories/GHSA-9899-m83m-qhpj
+Electron: Use-after-free in offscreen shared texture release() callback - https://github.com/advisories/GHSA-8x5q-pvf5-64mp
+Electron: Crash in clipboard.readImage() on malformed clipboard image data - https://github.com/advisories/GHSA-f37v-82c4-4x64
+Electron: Named window.open targets not scoped to the opener's browsing context - https://github.com/advisories/GHSA-f3pv-wv63-48x8
+Electron: Renderer command-line switch injection via undocumented commandLineSwitches webPreference - https://github.com/advisories/GHSA-9wfr-w7mm-pc7f
+Electron: Parent process code-sign check is spoofable - https://github.com/advisories/GHSA-jm7p-cc5g-qwxx
+Electron: Custom protocol with supportFetchAPI but not corsEnabled allows cross-origin reads - https://github.com/advisories/GHSA-v3j7-r9gq-3gjw
+Electron: Extension tab APIs operate across session boundaries - https://github.com/advisories/GHSA-m55f-7gqj-fr98
+Electron: shell.openPath path validation bypass via embedded null byte - https://github.com/advisories/GHSA-5c9j-mhmv-5xgx
+Electron: Context isolation bypass via Function.prototype.bind hijack - https://github.com/advisories/GHSA-h7rp-cf8h-j98x
+Electron: Cross-origin iframe can position native autofill popup - https://github.com/advisories/GHSA-x8rc-wpg4-grpf
+Electron: Permission Check Handler Receives Main Frame Origin Instead of Requesting Iframe Origin - https://github.com/advisories/GHSA-9pf5-hg6p-4pwp
+Electron: Off-screen rendering trusts GPU-supplied geometry over shared-memory size - https://github.com/advisories/GHSA-pfmc-3mgc-p6fp
+Electron: HTTP redirect followed into local file loader - https://github.com/advisories/GHSA-v64r-4m7r-3mvq
+Electron: window.open features string controls some window options considered privileged - https://github.com/advisories/GHSA-v93f-fgjr-hjrj
+Electron: Sandboxed iframe can bypass the allow-popups restriction via the OpenURL navigation path - https://github.com/advisories/GHSA-9f4c-93c8-jc8g
+Electron: Sandboxed iframes can launch external protocol handlers - https://github.com/advisories/GHSA-p2rr-rvmm-c5fp
+Electron: DevTools embedder handler executes arbitrary files via shell open - https://github.com/advisories/GHSA-f2r8-jv7c-xqmp
+Electron: contextBridge object copy honors prototype setters - https://github.com/advisories/GHSA-ff2p-hmqr-hxm4
+Electron: DevTools JavaScript Injection via Unsanitized Dock State Parameter - https://github.com/advisories/GHSA-4f78-qhmw-8j8m
+Electron drops inherited HTML sandbox restrictions for popups opened through OpenURLFromTab - https://github.com/advisories/GHSA-hq2x-r82h-9wj4
+Electron: Windows opened from a sandboxed top-level document do not inherit its sandbox restrictions - https://github.com/advisories/GHSA-gr2m-v5gq-v685
+Electron: File and HTTP protocol handlers allow cross-origin reads without corsEnabled - https://github.com/advisories/GHSA-j84w-jfhq-vhvj
+Electron: Local race condition in Squirrel.Mac update installation on macOS - https://github.com/advisories/GHSA-vv43-5jgx-7qv8
+Electron: <webview> can enable Node.js integration in Web Workers despite embedder restrictions - https://github.com/advisories/GHSA-9qh4-3jw8-366w
+Depends on vulnerable versions of extract-zip
+fix available via `npm audit fix --force`
+Will install electron@44.9.0, which is a breaking change
+node_modules/electron
+
+esbuild  <=0.24.2
+Severity: moderate
+esbuild enables any website to send any requests to the development server and read the response - https://github.com/advisories/GHSA-67mh-4wv8-2f99
+fix available via `npm audit fix --force`
+Will install vite@8.3.4, which is a breaking change
+node_modules/esbuild
+  vite  <=6.4.2
+  Depends on vulnerable versions of esbuild
+  node_modules/vite
+
+extract-zip  *
+Severity: high
+extract-zip unvalidated symlink path traversal - https://github.com/advisories/GHSA-jmr9-qjv8-65gv
+extract-zip allows arbitrary file writes through symlink archive entries - https://github.com/advisories/GHSA-7pqw-9j4j-h8q3
+fix available via `npm audit fix --force`
+Will install electron@44.9.0, which is a breaking change
+node_modules/extract-zip
+
+fast-uri  3.0.0 - 3.1.7
+Severity: high
+fast-uri vulnerable to host confusion via skipped IDN canonicalization on scheme-relative references - https://github.com/advisories/GHSA-5jgf-p345-68v8
+fast-uri vulnerable to server-side request forgery via malformed IPv6 normalization - https://github.com/advisories/GHSA-f65p-4m7j-42xc
+fast-uri vulnerable to server-side request forgery via repeated hostname percent-decoding - https://github.com/advisories/GHSA-fph4-wmhf-6fwf
+fast-uri vulnerable to host confusion via percent-encoded scheme normalization - https://github.com/advisories/GHSA-jqff-g426-hqxp
+fast-uri vulnerable to authority injection via an unvalidated port in serialize - https://github.com/advisories/GHSA-qw65-cvwx-89v3
+fast-uri vulnerable to inconsistent host case normalization via percent-encoded octets - https://github.com/advisories/GHSA-hrr3-gc8f-f4qj
+fix available via `npm audit fix`
+node_modules/fast-uri
+
+http-cache-semantics  <=4.2.0
+Severity: high
+http-cache-semantics max-stale handling can disclose cross-user cached responses - https://github.com/advisories/GHSA-ch52-4w7c-c8xp
+fix available via `npm audit fix`
+node_modules/http-cache-semantics
+
+js-yaml  4.0.0 - 4.3.1
+Severity: high
+js-yaml: maxTotalMergeKeys does not limit CPU use for empty merge sources - https://github.com/advisories/GHSA-2883-xcg3-v3hh
+fix available via `npm audit fix`
+node_modules/js-yaml
+
+react-router  6.0.0 - 7.17.0
+Severity: moderate
+React Router: Open redirect via backslash in <Link> and useNavigate (CVE-2025-68470 bypass) - https://github.com/advisories/GHSA-wrjc-x8rr-h8h6
+React Router: Arbitrary Constructor Injection via deserializeErrors() in React Router SSR Hydration - https://github.com/advisories/GHSA-337j-9hxr-rhxg
+fix available via `npm audit fix`
+node_modules/react-router
+  react-router-dom  6.0.0-alpha.0 - 7.17.0
+  Depends on vulnerable versions of react-router
+  node_modules/react-router-dom
+
+
+shell-quote  1.8.4 - 1.10.0
+Severity: critical
+shell-quote: `quote()` command injection via a line terminator in a token after a `{ comment }` token - https://github.com/advisories/GHSA-pqg4-j6r4-53mv
+fix available via `npm audit fix`
+node_modules/shell-quote
+  concurrently  9.2.3 - 9.2.4 || 10.0.0 - 10.0.5
+  Depends on vulnerable versions of shell-quote
+  node_modules/concurrently
+
+source-map-js  1.0.0 - 1.2.1
+Severity: high
+source-map-js allows event-loop denial of service through indexed source-map section offsets - https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+fix available via `npm audit fix`
+node_modules/source-map-js
+
+sprintf-js  *
+Severity: moderate
+sprintf-js vulnerable to denial of service through unbounded precision specifiers - https://github.com/advisories/GHSA-hp3w-g68c-fv3c
+fix available via `npm audit fix --force`
+Will install electron@44.9.0, which is a breaking change
+node_modules/sprintf-js
+  roarr  <=2.15.4
+  Depends on vulnerable versions of sprintf-js
+  node_modules/roarr
+    global-agent  <=3.0.0
+    Depends on vulnerable versions of roarr
+    node_modules/global-agent
+      @electron/get  1.6.0 - 4.0.3
+      Depends on vulnerable versions of global-agent
+      node_modules/@electron/get
+      node_modules/app-builder-lib/node_modules/@electron/get
+        app-builder-lib  25.1.1 || 26.6.0 - 27.0.0-alpha.2
+        Depends on vulnerable versions of @electron/get
+        Depends on vulnerable versions of dmg-builder
+        Depends on vulnerable versions of electron-builder-squirrel-windows
+        node_modules/app-builder-lib
+          dmg-builder  26.6.0 - 27.0.0-alpha.2
+          Depends on vulnerable versions of app-builder-lib
+          node_modules/dmg-builder
+            electron-builder  19.25.0 || 26.6.0 - 27.0.0-alpha.2
+            Depends on vulnerable versions of app-builder-lib
+            Depends on vulnerable versions of dmg-builder
+            node_modules/electron-builder
+          electron-builder-squirrel-windows  26.6.0 - 27.0.0-alpha.2
+          Depends on vulnerable versions of app-builder-lib
+          node_modules/electron-builder-squirrel-windows
+
+undici  <=6.28.0
+Severity: high
+undici vulnerable to Denial of Service via unhandled error in WebSocket permessage-deflate decompression - https://github.com/advisories/GHSA-3wwx-pv8p-q78v
+undici vulnerable to downstream response splitting via retry interceptor - https://github.com/advisories/GHSA-r53p-7pc4-xj5r
+undici vulnerable to Denial of Service via unrequested WebSocket subprotocol - https://github.com/advisories/GHSA-rfgv-xxqx-mfg5
+fix available via `npm audit fix`
+node_modules/undici
+
+
+23 vulnerabilities (11 moderate, 10 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force

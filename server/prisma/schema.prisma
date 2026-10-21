@@ -1,0 +1,1017 @@
+// CHAS — the database, as PostgreSQL holds it.
+//
+// This file replaces `electron/store.cjs`, which kept everything in one JSON
+// object in the user profile. That store was honest about what it was: a map
+// of learner id to measurement, good enough to survive a restart. Postgres
+// asks a harder question of the same data — what is a row, what is a key, and
+// what must never be true — and the answers below are where most of the
+// design lives.
+//
+// FOUR RULES THIS SCHEMA KEEPS
+//
+// 1. A measurement is an EVENT, not a field on a learner. The JSON store held
+//    one measurement per learner and overwrote it; a school weighs children
+//    every term, and the second weigh-in is not a correction of the first. So
+//    measurements are their own table with a date, and "the learner's current
+//    height" is the newest row, never a column. This is the single biggest
+//    change from the file store, and it is what makes a second weigh-in — and
+//    therefore any trend at all — possible.
+//
+// 2. Nothing is computed and stored. There is no `bmiBand` column. The bands
+//    come from WHO's LMS tables through src/lib/nutrition.ts, and a stored
+//    band would be a second source of truth that goes stale the moment a
+//    cut-off is corrected. Height, weight and a date are facts; a band is a
+//    conclusion, and conclusions are derived on read.
+//
+// 3. Deletes are soft where a record is evidence. A learner who leaves the
+//    school is `archivedAt`, not gone: their measurements are part of last
+//    term's SF8, which has already been submitted. Hard deletes are reserved
+//    for things nobody has reported upward.
+//
+// 4. Every write is attributable. `recordedById` is required on every clinical
+//    row, because the audit trail this app has always promised needs a real
+//    user id behind it and the file store had a hardcoded string.
+//
+// PRIVACY. These are minors' health records under RA 10173 (Philippine Data
+// Privacy Act). Two consequences visible here: no learner's name, birth date
+// or LRN is ever in a log or an audit `detail` field (the audit table stores
+// ids and actions, never the values), and every query is scoped to the
+// signed-in account's school by the API rather than by a filter the client
+// is trusted to send.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// The school and its classes
+// ---------------------------------------------------------------------------
+
+/// One school. CHAS is deployed per school, but the column exists so a
+/// division-level deployment later is a query change and not a migration —
+/// every scoped table below already hangs off this.
+model School {
+  id         String  @id @default(cuid())
+  name       String
+  /// A DepEd School ID is issued, not invented. Nullable because ours is not
+  /// on file, and printing a number nobody can vouch for on an SF8 is worse
+  /// than leaving the cell blank.
+  depedId    String? @unique
+  district   String
+  division   String
+  region     String
+  schoolYear String
+
+  /// The school's own logo, set by the head in School settings: a PNG the
+  /// app has already scaled to at most 512px. Null means the logo shipped
+  /// with the app. Bytes in the row rather than a file on disk, so a backup
+  /// of the database carries it.
+  logo          Bytes?
+  logoType      String?
+  logoUpdatedAt DateTime?
+
+  /// The invitation slip's wording, edited on the Slips screen by the head
+  /// or the nurse: { title, subtitle, message, messageEn, closing, signer }.
+  /// Null means the wording shipped with the app. The learner's name, class
+  /// and Stub ID, and the meeting's date, time and venue, are never part of
+  /// it: those are filled in on each slip.
+  slipText      Json?
+
+  sections      Section[]
+  users         User[]
+  learners      Learner[]
+  meetings      Meeting[]
+  announcements Announcement[]
+  gradeLevels   GradeLevel[]
+  feeding       FeedingProgram[]
+  rollovers     SchoolYearRollover[]
+  followUps     FollowUpWeighIn[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("schools")
+}
+
+/// A year level — "Grade 4". A row, not an integer on a section.
+///
+/// WHY THIS IS A TABLE. It used to be a column: `sections.gradeLevel`, an Int,
+/// which is enough while a school runs exactly one section per year and the
+/// section is therefore the grade. Detailen does, and for that school the two
+/// words are interchangeable. They are not the same thing anywhere else, and
+/// the difference shows up the moment a head opens Grade 1 - Mabini beside
+/// Grade 1 - Rizal: with the integer there is no row that IS Grade 1, only two
+/// sections that both claim to be in it. A grade with no sections yet cannot
+/// be expressed at all, so the head cannot set the school up in the order she
+/// actually does it — lay out the years first, then fill them.
+///
+/// `level` is the number the rest of the system counts on and `name` is what
+/// a person reads. They are kept apart because they answer to different
+/// authorities: the level orders the SF8's sheets, seeds the stub id and
+/// picks the WHO age band, while the name is whatever the school calls it and
+/// may be "Grade 1" or "Baitang 1" without a single query changing.
+model GradeLevel {
+  id       String @id @default(cuid())
+  schoolId String
+  /// As the school writes it. "Grade 4".
+  name     String
+  /// 1 through 6 at an elementary school. Orders everything, and is the
+  /// number stub ids and age bands are derived from.
+  level    Int
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sections Section[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One row per year per school, said twice. The level is what the code
+  /// counts on and the name is what a person searches for, and a school with
+  /// two "Grade 4"s has a bug in whichever of the two a screen happens to
+  /// have used.
+  @@unique([schoolId, level])
+  @@unique([schoolId, name])
+  @@index([schoolId, level])
+  @@map("grade_levels")
+}
+
+/// A class. One row per section the school actually runs — "Mabini", under
+/// Grade 1. A school that runs one section per year has one row per year and
+/// may well name it "Grade 1"; that is a naming choice now rather than
+/// something the schema has assumed.
+model Section {
+  id           String @id @default(cuid())
+  schoolId     String
+  name         String
+  /// The year this section belongs to. Required: a section outside a grade
+  /// level has no age band, no place in the SF8 and no stub id, so there is
+  /// no sensible row to write.
+  gradeLevelId String
+  /// The class adviser's name, as the SF8 prints it. Not an account -
+  /// advisers do not sign in. Changes each school year.
+  adviser      String?
+
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  gradeLevel GradeLevel  @relation(fields: [gradeLevelId], references: [id])
+  learners   Learner[]
+  enrolments Enrolment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Two sections in one school cannot share a name — school-wide, not
+  /// per-grade. "Bonifacio" under both Grade 1 and Grade 2 is a real thing a
+  /// school does, and it is also two sections a person cannot tell apart on a
+  /// printed list or in a section picker. The
+  /// school picks distinct names; the schema is what makes it.
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([gradeLevelId])
+  @@map("sections")
+}
+
+// ---------------------------------------------------------------------------
+// Who is signed in
+// ---------------------------------------------------------------------------
+
+/// Two posts, both school-wide. There is no class-adviser account: advisers
+/// do not sign in to CHAS. An adviser's NAME still belongs to a section,
+/// because the SF8 prints it, but it is a fact about the class, not a user.
+enum Role {
+  /// Reads every section, school-wide. The head's account.
+  ADMIN
+  /// Reads every section too, but for a different reason and with different
+  /// powers. The nurse is the health side of the school: she weighs any
+  /// learner, keeps the immunization cards, and answers for a child whose
+  /// band came back wrong - so her scope is the school, not a class. A health
+  /// record that stopped at a section boundary would be no use to the person
+  /// the child is sent to.
+  ///
+  /// She is NOT a second head, and two things separate them. She cannot
+  /// create or disable accounts - routes/users.ts sits behind requireAdmin -
+  /// and she does not own the school year: opening and closing a weighing
+  /// round, exporting the SF8 and posting notices stay the head's. The only
+  /// thing they share is sight of the roster.
+  NURSE
+}
+
+model User {
+  id       String @id @default(cuid())
+  schoolId String
+  /// Lowercase, unique per school. The shape DepEd accounts use:
+  /// "Mrs. C. Delos Reyes" -> "c.delosreyes".
+  username String
+  /// Display name, as a DepEd form wants it written.
+  fullName String
+  role     Role
+
+  /// Argon2id. The full PHC string (`$argon2id$v=19$m=...`), so the
+  /// parameters travel with the hash and can be raised later without
+  /// invalidating existing passwords.
+  passwordHash String
+  /// The password was set by somebody else - the first-launch default, or
+  /// the head creating or resetting the account. Until the holder chooses
+  /// their own, the API answers nothing but the change-password call.
+  mustChangePassword Boolean @default(false)
+
+  /// Set on a first successful sign-in against a seeded account, so an
+  /// install that has never been used can be told apart from a dormant one.
+  lastLoginAt DateTime?
+  /// Disabled rather than deleted: an account that recorded measurements is
+  /// referenced by every row it wrote.
+  disabledAt  DateTime?
+  /// Deleted by the head. The row stays so the records it wrote still name
+  /// who wrote them, but it is gone from the Roles list, cannot sign in, and
+  /// its username is freed for somebody else.
+  deletedAt   DateTime?
+
+  school        School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sessions      Session[]
+  recoveryCodes RecoveryCode[]
+
+  measurements       Measurement[]
+  absences           Absence[]
+  immunizations      Immunization[]
+  slipEvents         Slip[]
+  auditEntries       AuditEntry[]
+  announcements      Announcement[]
+  enrolmentsRecorded Enrolment[]           @relation("EnrolmentRecordedBy")
+  conditions         HealthCondition[]
+  vaccineDoses       VaccineDose[]
+  revisions          MeasurementRevision[]
+  rollovers          SchoolYearRollover[]
+  feedingCreated     FeedingProgram[]
+  feedingEnrolled    FeedingBeneficiary[]
+  feedingServings    FeedingServing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, username])
+  @@map("users")
+}
+
+/// Single-use recovery codes, one set per account, for a forgotten password.
+/// Made by the account holder on My account; they work offline. Argon2id, like
+/// passwords. A new set replaces the old one.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("recovery_codes")
+}
+
+/// Server-side sessions rather than stateless JWTs.
+///
+/// A JWT cannot be revoked before it expires, and the one thing a school head
+/// must be able to do with a lost laptop is end its session immediately.
+/// Deleting a row does that; a blacklist for JWTs would be this table with
+/// extra steps.
+model Session {
+  /// The opaque random token, stored HASHED. A leaked database dump must not
+  /// hand the reader a set of live sessions.
+  tokenHash String   @id
+  userId    String
+  expiresAt DateTime
+  /// Coarse provenance for the audit trail. Deliberately not a full
+  /// fingerprint: it is diagnostic, not a tracking record.
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// The children
+// ---------------------------------------------------------------------------
+
+enum Sex {
+  M
+  F
+}
+
+/// Whether the immunization card is complete, as the school last saw it.
+/// Three values rather than a boolean: "no card on file" is a records problem
+/// and "card seen, doses missing" is a health one, and the school chases them
+/// in different buildings.
+enum ImmunizationStatus {
+  COMPLETE
+  INCOMPLETE
+  NONE
+}
+
+model Learner {
+  id        String @id @default(cuid())
+  schoolId  String
+  sectionId String
+
+  /// Learner Reference Number. Unique nationally, so unique here — this is
+  /// the column that stops one child being enrolled twice under two spellings
+  /// of their surname.
+  lrn        String   @unique
+  lastName   String
+  firstName  String
+  middleName String?
+  /// Jr., III, and the rest. Its own column rather than tacked onto the
+  /// surname: the SF8 prints it in a cell of its own, and a "Cruz Jr." in the
+  /// surname column sorts between "Cruz" and "Cruzada".
+  nameExt    String?
+  sex        Sex
+  /// A date, not a timestamp. A birthday has no time of day, and storing one
+  /// invites a timezone to shift it across midnight.
+  birthDate  DateTime @db.Date
+
+  /// The barcode on the invitation stub. Stable for the life of the record so
+  /// a stub printed in August still scans in October.
+  stubId String @unique
+
+  /// Left the school, or moved section. The row stays: their measurements are
+  /// in an SF8 that has already been submitted.
+  archivedAt DateTime?
+
+  /// Standing notes about the child that the school should read before a
+  /// weigh-in: uses a wheelchair, hard of hearing on the left, panics at the
+  /// stadiometer. Deliberately learner-level and not attached to a condition,
+  /// because most of what belongs here is not a diagnosis.
+  healthNotes String?
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  section Section @relation(fields: [sectionId], references: [id])
+
+  measurements  Measurement[]
+  absences      Absence[]
+  immunizations Immunization[]
+  slips         Slip[]
+  enrolments    Enrolment[]
+  conditions    HealthCondition[]
+  vaccineDoses  VaccineDose[]
+  revisions     MeasurementRevision[]
+  feeding       FeedingBeneficiary[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Every list in the app is "this section's learners, by name".
+  @@index([sectionId, lastName, firstName])
+  @@index([schoolId])
+  @@map("learners")
+}
+
+// ---------------------------------------------------------------------------
+// The enrolment history
+// ---------------------------------------------------------------------------
+
+/// Where a learner sat in a given school year.
+///
+/// WHY THIS EXISTS. A learner is registered once and comes back every June.
+/// `Learner.sectionId` answers "which class is this child in now", which is
+/// what every screen and every scope check asks — and it is a single value, so
+/// the moment a child moves up a grade the answer to "which class were they in
+/// last year" is gone. This table keeps that answer.
+///
+/// IT DOES NOT REPLACE `Learner.sectionId`. That column stays the current
+/// class and stays the thing the API scopes on. Deriving the current section
+/// from the newest row here would put a join under every roster read.
+/// This table is history; that column is the present.
+model Enrolment {
+  id         String @id @default(cuid())
+  learnerId  String
+  /// As the school writes it: "2026-2027". Copied from the school at the time
+  /// rather than joined, for the same reason an announcement copies its
+  /// author's name — a year label is what was true then.
+  schoolYear String
+  sectionId  String
+
+  status EnrolmentStatus @default(ENROLLED)
+
+  /// How the year ENDED for this child, written when the head closes the
+  /// year. Null while the year is still running. Kept apart from `status`,
+  /// which says how they came into the year: a transferee can be promoted.
+  outcome EnrolmentOutcome?
+
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  section    Section @relation(fields: [sectionId], references: [id])
+  recordedBy User    @relation("EnrolmentRecordedBy", fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One enrolment per learner per year. A correction updates the row; a child
+  /// counted twice in one year would be counted twice in that year's SF8.
+  @@unique([learnerId, schoolYear])
+  @@index([sectionId, schoolYear])
+  @@map("enrolments")
+}
+
+/// What the school year says about this child's standing in it.
+enum EnrolmentStatus {
+  ENROLLED
+  TRANSFERRED_IN
+  RETURNING
+  TRANSFERRED_OUT
+  DROPPED
+}
+
+/// The end of a school year for one child, as the head records it when the
+/// year is closed. PROMOTED moves up a grade, RETAINED repeats it, COMPLETED
+/// finished the last grade the school runs. The last three leave the roster.
+enum EnrolmentOutcome {
+  PROMOTED
+  RETAINED
+  COMPLETED
+  TRANSFERRED_OUT
+  DROPPED
+}
+
+/// One closing of a school year and opening of the next.
+///
+/// Kept so the head can take it back. Everything else a rollover changes can
+/// be worked out from the enrolment rows - last year's row still says which
+/// section each child was in - but the advisers' names and the meeting that
+/// was current are overwritten, so their old values are stored here.
+model SchoolYearRollover {
+  id       String @id @default(cuid())
+  schoolId String
+
+  fromYear String
+  toYear   String
+
+  /// Section id to adviser name, as they were before the rollover.
+  advisersBefore Json
+  /// The meeting that was "next" when the year was closed.
+  meetingId      String?
+
+  rolledById String
+  /// Stamped as the rollover's last write. Anything recorded after this
+  /// instant belongs to the new year, and its existence is what stops an undo.
+  rolledAt   DateTime
+  undoneAt   DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  rolledBy User   @relation(fields: [rolledById], references: [id])
+
+  @@index([schoolId, rolledAt(sort: Desc)])
+  @@map("school_year_rollovers")
+}
+
+// ---------------------------------------------------------------------------
+// What the school was told at registration
+// ---------------------------------------------------------------------------
+
+/// Something the child already lives with, as reported at registration.
+///
+/// NOT A DIAGNOSIS AND NOT A SCREENING RESULT. This is what a parent said on a
+/// registration form, which is why it carries a status of its own rather than
+/// a date and a clinician: "asthma, recurring" is a thing to know before a
+/// child runs, and it is not the school's finding.
+model HealthCondition {
+  id        String @id @default(cuid())
+  learnerId String
+
+  condition String
+  status    ConditionStatus @default(UNKNOWN)
+
+  /// Medication or treatment as reported. Free text on purpose: a drug list
+  /// with a controlled vocabulary is a clinical system, and this is a school.
+  treatment String?
+  notes     String?
+
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([learnerId])
+  @@map("health_conditions")
+}
+
+enum ConditionStatus {
+  ACTIVE
+  RESOLVED
+  RECURRING
+  UNKNOWN
+}
+
+/// One line off an immunization card.
+///
+/// Distinct from `Immunization`, which is the school's own three-value
+/// judgement of the card as a whole on the day somebody looked at it. This is
+/// the card's contents: a vaccine, which dose, when it was given. The two do
+/// not replace each other — a complete card is a summary, and "BCG, dose 1,
+/// 2019-03-02" is the evidence for it.
+model VaccineDose {
+  id        String @id @default(cuid())
+  learnerId String
+
+  vaccine String
+  /// "1", "2", "Booster". A string rather than an integer because boosters and
+  /// annual doses are not numbered and an integer column would force a lie.
+  dose    String
+
+  /// Null when the card records a dose without a legible date, which is common
+  /// on a card that has been in a drawer for eight years.
+  givenOn DateTime? @db.Date
+
+  status  DoseStatus @default(GIVEN)
+  remarks String?
+
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([learnerId, givenOn(sort: Desc)])
+  @@map("vaccine_doses")
+}
+
+enum DoseStatus {
+  GIVEN
+  SCHEDULED
+  MISSED
+  UNKNOWN
+}
+
+// ---------------------------------------------------------------------------
+// What gets recorded
+// ---------------------------------------------------------------------------
+
+/// One weigh-in. See rule 1 at the top: this is an event, not a field.
+model Measurement {
+  id        String @id @default(cuid())
+  learnerId String
+
+  /// Centimetres and kilograms, to one decimal.
+  ///
+  /// Decimal, not Float. A weight is a decimal quantity read off a scale, and
+  /// binary floating point cannot hold 24.1 exactly — which is how a figure
+  /// typed as 24.1 comes back as 24.099999 and an SF8 disagrees with the
+  /// paper it was copied from.
+  heightCm Decimal @db.Decimal(4, 1)
+  weightKg Decimal @db.Decimal(4, 1)
+
+  /// The date the weigh-in BELONGS to, which the nurse may set to a past
+  /// session. Distinct from createdAt, which is when the row was typed — the
+  /// activity feed orders by the second, reports group by the first.
+  measuredOn DateTime @db.Date
+
+  /// The nurse's note on this weigh-in ("Recovering from dengue, weight loss
+  /// expected"). Context read beside the figures; it never changes the WHO
+  /// classification. Added 2026-10-21.
+  note String? @db.VarChar(300)
+
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One measurement per learner per session date. A second entry for the
+  /// same day is a correction of the first, not a new fact, so it updates
+  /// this row rather than creating a duplicate the reports would double-count.
+  @@unique([learnerId, measuredOn])
+  @@index([learnerId, measuredOn(sort: Desc)])
+  @@index([measuredOn])
+  @@map("measurements")
+}
+
+/// A learner who was not on the scale that day.
+///
+/// Stored rather than thrown away, and deliberately NOT a measurement of
+/// zero: "absent" is a different fact from "not yet measured", the weigh-in
+/// queue has to skip them again after a restart, and a 0cm learner in the
+/// roster would be a real row claiming a real child is nothing tall.
+model Absence {
+  id           String   @id @default(cuid())
+  learnerId    String
+  measuredOn   DateTime @db.Date
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([learnerId, measuredOn])
+  @@index([learnerId])
+  @@map("absences")
+}
+
+/// An immunization card, as somebody actually looked at it.
+///
+/// Its own table with a date rather than a column on Learner, for the same
+/// reason measurements are: a card is checked, then checked again a year
+/// later, and "what does it say now" is the newest row.
+model Immunization {
+  id           String             @id @default(cuid())
+  learnerId    String
+  status       ImmunizationStatus
+  checkedOn    DateTime           @db.Date
+  recordedById String
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([learnerId, checkedOn])
+  @@index([learnerId, checkedOn(sort: Desc)])
+  @@map("immunizations")
+}
+
+// ---------------------------------------------------------------------------
+// The invitation, and the parent who answers it
+// ---------------------------------------------------------------------------
+
+/// When and where the parents of flagged learners are asked to come.
+model Meeting {
+  id       String   @id @default(cuid())
+  schoolId String
+  /// Date and time are separate: the slip prints "2:00 PM", and a combined
+  /// timestamp would drag a timezone into a line of text on a piece of paper.
+  date     DateTime @db.Date
+  time     String
+  venue    String
+
+  /// Only one meeting is "the next one" at a time. The slips screen edits
+  /// this; printed slips freeze their own copy below.
+  isCurrent Boolean @default(false)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slips  Slip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, isCurrent])
+  @@map("meetings")
+}
+
+/// An extra weigh-in for a chosen set of learners - usually the ones who need
+/// monitoring - between the baseline and the endline. It adds nothing to the
+/// measurements themselves: a learner is "done" for it once they have a
+/// measurement dated on or after `startedOn`, and the baseline and endline,
+/// which the SF8 reads, are untouched. One is open at a time; ending it only
+/// stamps `closedAt`. Added 2026-10-11.
+model FollowUpWeighIn {
+  id         String    @id @default(cuid())
+  schoolId   String
+  label      String
+  startedOn  DateTime  @db.Date
+  learnerIds String[]
+  closedAt   DateTime?
+  createdById String?
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, closedAt])
+  @@map("follow_up_weigh_ins")
+}
+
+enum SlipState {
+  NOT_PRINTED
+  PRINTED
+  ATTENDED
+}
+
+/// One learner's invitation.
+///
+/// The three states are three different facts: nothing sent, an invitation
+/// handed out, and a parent who actually came. A stub that comes back says
+/// the letter arrived, which is not the same as anybody turning up, and the
+/// school needs the second fact.
+model Slip {
+  id        String    @id @default(cuid())
+  learnerId String
+  state     SlipState @default(NOT_PRINTED)
+
+  /// Only the print transition may write this. A scan at the meeting door
+  /// knows a parent arrived; it does not know when the invitation was run
+  /// off, and stamping the scan time here would invent a fact.
+  printedAt  DateTime?
+  attendedAt DateTime?
+
+  /// The meeting THIS slip was printed for, frozen at print time. The paper
+  /// in a parent's hand names a specific date, and changing next month's
+  /// meeting must not silently rewrite what last month's slip said.
+  meetingId String?
+
+  /// The school year this invitation belongs to, "2026-2027". A parent who
+  /// came in 2026 has not come in 2027, so a new school year starts every
+  /// learner with no slip, and last year's rows stay as they were.
+  schoolYear String
+
+  recordedById String
+
+  learner    Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  meeting    Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  recordedBy User     @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One live slip per learner per school year. Re-printing re-stamps this
+  /// row; the history of who was invited to what lives in the audit log.
+  @@unique([learnerId, schoolYear])
+  @@index([state])
+  @@map("slips")
+}
+
+// ---------------------------------------------------------------------------
+// The audit trail
+// ---------------------------------------------------------------------------
+
+/// Append-only. Nothing in the API updates or deletes a row here.
+///
+/// The app has promised an audit trail since its first screen and has never
+/// had a real one — src/data/mock.ts still carries nine hand-written entries
+/// with fake hashes. This is the table that makes the promise true.
+///
+/// NOT yet hash-chained. A chain is what makes the log tamper-EVIDENT rather
+/// than merely append-only, and claiming tamper-evidence without one would be
+/// the same overstatement the mock entries made. `prevHash` and `hash` are
+/// here, nullable, so the writer can be added without a migration.
+model AuditEntry {
+  id         BigInt   @id @default(autoincrement())
+  at         DateTime @default(now())
+  actorId    String?
+  /// e.g. MEASUREMENT_RECORDED, SLIP_BATCH_PRINTED, LOGIN_FAILED.
+  action     String
+  /// What was acted on, as an id — never a learner's name, LRN or birth date.
+  /// A log is copied, mailed and pasted into tickets; it must not be a second
+  /// place minors' identifying data lives.
+  targetType String?
+  targetId   String?
+  /// Structured extra context, same rule: ids and counts, never values.
+  detail     Json?
+  ipAddress  String?
+
+  prevHash String?
+  hash     String?
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([at(sort: Desc)])
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@map("audit_entries")
+}
+
+// ---------------------------------------------------------------------------
+// School notices
+// ---------------------------------------------------------------------------
+
+/// Who a notice was written for.
+///
+/// A LABEL, not a permission. Every signed-in account can read every notice —
+/// there is nothing here worth hiding from staff, and a notice nobody can
+/// find is not a notice. What the audience does is tell the writer, and
+/// whoever reads it in six months, who the words were meant for. "Parents" on
+/// a notice that will be read aloud at a meeting changes how it is written,
+/// and that is worth a column.
+enum Audience {
+  STAFF
+  PARENTS
+}
+
+/// Something the school head told the school.
+///
+/// This lived in the per-laptop JSON file, which made it a note to one machine
+/// rather than a notice to a school: the head wrote "Grade 4 weigh-in moves to
+/// Monday" on her own workstation, and nobody else could ever see it. It is a
+/// fact about the school, so it belongs beside the roster it is about.
+model Announcement {
+  id       String   @id @default(cuid())
+  schoolId String
+  title    String
+  body     String
+  audience Audience @default(STAFF)
+
+  /// Held at the top of the list until it is unpinned.
+  pinned Boolean @default(false)
+
+  /// Who wrote it. Nullable only so an account can be removed without taking
+  /// the school's notices with it.
+  authorId   String?
+  /// The author's name AS IT WAS when the notice was posted. A notice records
+  /// what was said and by whom at that moment; rendering the byline through a
+  /// join would silently rewrite history when a name is corrected, and would
+  /// leave it blank when an account is deleted.
+  authorName String
+
+  author User?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, pinned, createdAt(sort: Desc)])
+  @@map("announcements")
+}
+
+/// Every measurement ever typed, including the ones that were replaced.
+///
+/// WHY THIS EXISTS ALONGSIDE `measurements`. That table holds ONE row per
+/// learner per day, on purpose: the SF8 has one height and one weight per
+/// session, and a school that filed two would have to decide which one to
+/// submit. So a nurse correcting a fat-fingered height overwrites the row -
+/// which is right for the form and wrong for the record. The number that was
+/// there before is gone, and with it the answer to "what did it say when I
+/// printed the slip on Tuesday".
+///
+/// This table is the answer. It is APPEND-ONLY and nothing ever updates or
+/// deletes a row in it: recording writes one, correcting writes another,
+/// withdrawing writes a third. The measurement table stays the current truth
+/// and this stays the account of how it got there.
+///
+/// IT HOLDS THE VALUES, and that is a deliberate departure from the audit log
+/// two tables down, which deliberately does NOT - see the comment there about
+/// not duplicating identifying health data into a log with a different
+/// retention story. The difference is that this is not a general-purpose log:
+/// it is part of the learner's health record, lives and dies with the learner
+/// row, and is readable only by an account that can already read the
+/// measurement it describes. A revision without the figure in it would record
+/// that something changed and lose the only thing worth knowing about it.
+model MeasurementRevision {
+  id        String @id @default(cuid())
+  learnerId String
+
+  /// The session this was a measurement OF, which is not when it was typed.
+  /// A correction made on Friday to Tuesday's weigh-in carries Tuesday here
+  /// and Friday in `at`.
+  measuredOn DateTime @db.Date
+
+  /// Null on a WITHDRAWN row: there is no figure, because the point of the
+  /// row is that the figure was taken back.
+  heightCm Decimal? @db.Decimal(4, 1)
+  weightKg Decimal? @db.Decimal(4, 1)
+
+  kind MeasurementRevisionKind
+
+  recordedById String
+  /// The wall-clock instant somebody pressed save.
+  at           DateTime @default(now())
+
+  learner    Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  /// One learner's recording history, newest first, which is the only way
+  /// this table is ever read.
+  @@index([learnerId, at(sort: Desc)])
+  /// The school-wide measurement history, newest first.
+  @@index([at(sort: Desc)])
+  @@map("measurement_revisions")
+}
+
+enum MeasurementRevisionKind {
+  /// The first figure filed for that learner on that day.
+  RECORDED
+  /// A figure typed over an existing one for the same day.
+  CORRECTED
+  /// The day's measurement was taken back entirely.
+  WITHDRAWN
+}
+
+// ---------------------------------------------------------------------------
+// The feeding program
+// ---------------------------------------------------------------------------
+
+/// One school feeding program: "Gulayan Supplementary Feeding, Q1 2026-2027".
+///
+/// WHY THIS IS HERE. Everything above records what a child WAS - a height, a
+/// weight, a vaccine card. A feeding program is the one intervention this
+/// school actually runs off the back of those figures, and until now it was
+/// kept on paper: a list of names in a notebook and a tick against each day.
+/// The tick is the part that matters. A division office asking whether a
+/// wasted child was fed for the full sixty days is asking for a count of
+/// servings, and a notebook cannot answer it.
+///
+/// NO STATUS COLUMN, for the same reason there is no `bmiBand`. Whether a
+/// program is planned, running or finished is `startsOn`, `endsOn` and
+/// `closedAt` read against today. A stored status is a second source of truth
+/// that goes stale at midnight with nobody watching.
+model FeedingProgram {
+  id       String @id @default(cuid())
+  schoolId String
+
+  /// As the school names it on its own paperwork.
+  name      String
+  /// Free text. What is being served, who funds it, whatever the next head
+  /// needs in order to understand the row.
+  notes     String?
+
+  /// The window the program covers. Both required: a feeding program without
+  /// an end date is not a program, it is an intention, and the summary counts
+  /// serving days between these two.
+  startsOn DateTime @db.Date
+  endsOn   DateTime @db.Date
+
+  /// Null while the program is live. Closing is not a delete - the servings
+  /// stay attached and last term's summary must keep printing.
+  closedAt DateTime?
+
+  createdById String
+
+  school        School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy     User                 @relation(fields: [createdById], references: [id])
+  beneficiaries FeedingBeneficiary[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// A school does not run two programs under one name. Two rows called
+  /// "Q1 Feeding" is a list nobody can pick from and two summaries nobody can
+  /// tell apart.
+  @@unique([schoolId, name])
+  @@index([schoolId, startsOn(sort: Desc)])
+  @@map("feeding_programs")
+}
+
+/// One learner taken onto one program.
+///
+/// A row here is the school's decision, not a computed fact. Who is ELIGIBLE
+/// comes from the WHO bands, which this database deliberately does not store
+/// - the nurse reads the roster with those bands on screen and picks. What is
+/// stored is who she picked and why, because that is the part the school has
+/// to be able to defend later.
+model FeedingBeneficiary {
+  id        String @id @default(cuid())
+  programId String
+  learnerId String
+
+  /// The grounds, in the nurse's words. "Severely wasted at the first
+  /// weigh-in", "referred by the class adviser". Nullable, because a program
+  /// that takes a whole grade level has no per-child reason to give.
+  reason String?
+
+  enrolledById String
+
+  program  FeedingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  learner  Learner          @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  enrolledBy User           @relation(fields: [enrolledById], references: [id])
+  servings FeedingServing[]
+
+  createdAt DateTime @default(now())
+
+  /// One child is on one program once. A second row would double every count
+  /// in the summary and give the child two attendance sheets.
+  @@unique([programId, learnerId])
+  @@index([programId])
+  @@index([learnerId])
+  @@map("feeding_beneficiaries")
+}
+
+/// One child, one day of the program.
+///
+/// `present` rather than two tables, because a day a child was on the list
+/// and did not come is a fact the school needs. Absence is the number that
+/// tells a head the program is being served but not reached; deleting the row
+/// instead would make "did not come" and "nobody recorded that day"
+/// indistinguishable, which is the exact failure the paper notebook had.
+model FeedingServing {
+  id            String   @id @default(cuid())
+  beneficiaryId String
+  servedOn      DateTime @db.Date
+  present       Boolean  @default(true)
+
+  recordedById String
+
+  beneficiary FeedingBeneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  recordedBy  User               @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One record per child per day. Marking twice is a correction of the
+  /// first, not a second meal.
+  @@unique([beneficiaryId, servedOn])
+  @@index([servedOn])
+  @@map("feeding_servings")
+}

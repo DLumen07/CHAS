@@ -1,0 +1,3 @@
+Could not retrieve updated translations for the current locale
+Could not retrieve updated translations for the current locale
+Unknown Electron release "33.4.x", please check manually for available security fixes.

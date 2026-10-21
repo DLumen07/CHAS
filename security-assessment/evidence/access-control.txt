@@ -1,0 +1,10 @@
+Role-based access test: nurse account calling head-only functions
+sign-in as s.nurse: HTTP/1.1 200 OK
+GET /api/users                   -> HTTP 403
+POST /api/users                  -> HTTP 403
+GET /api/activity?limit=5        -> HTTP 200 (dashboard feed, open to both roles by design)
+PUT /api/school (school settings) -> HTTP 403
+POST /api/school-year/rollover   -> HTTP 403
+GET /api/learners (allowed)      -> HTTP 200
+GET /api/users (no session)      -> HTTP 401
+GET /api/learners (forged token) -> HTTP 401

@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chas-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server", "run", "dev"],
+      "port": 4000
+    },
+    {
+      "name": "chas-renderer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:renderer"],
+      "port": 5173
+    },
+    {
+      "name": "chas-renderer-offline",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["cross-env", "VITE_CHAS_BACKEND=local", "vite", "--port", "5174", "--strictPort"],
+      "port": 5174
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+##### http://127.0.0.1:47810/api/learners/cmverdifs009quzdggxus206i*
+[12:42:01] [WARNING] using 'C:\Users\daren de lumen\AppData\Local\Temp\claude\C--Users-daren-de-lumen-OneDrive-Desktop-CHAS\69616fb7-20f5-4a31-ac7b-eef6497a6163\scratchpad\assess\tools\sqlmap-out' as the output directory
+[12:42:01] [INFO] testing connection to the target URL
+[12:42:02] [INFO] testing if the target URL content is stable
+[12:42:02] [INFO] testing if URI parameter '#1*' is dynamic
+[12:42:02] [WARNING] URI parameter '#1*' does not appear to be dynamic
+[12:42:03] [WARNING] heuristic (basic) test shows that URI parameter '#1*' might not be SQL injectable
+[12:42:03] [INFO] testing for SQL injection on URI parameter '#1*'
+[12:43:41] [WARNING] URI parameter '#1*' does not seem to be injectable
+[12:43:41] [CRITICAL] all tested parameters do not appear to be injectable. Try to increase values for '--level'/'--risk' options if you wish to perform more tests. If you suspect that there is some kind of protection mechanism involved (e.g. WAF) maybe you could try to use option '--tamper' (e.g. '--tamper=space2comment') and/or switch '--random-agent'
+[12:43:41] [WARNING] HTTP error codes detected during run:
+##### http://127.0.0.1:47810/api/activity?limit=5
+[12:43:43] [WARNING] using 'C:\Users\daren de lumen\AppData\Local\Temp\claude\C--Users-daren-de-lumen-OneDrive-Desktop-CHAS\69616fb7-20f5-4a31-ac7b-eef6497a6163\scratchpad\assess\tools\sqlmap-out' as the output directory
+[12:43:43] [INFO] testing connection to the target URL
+[12:43:44] [INFO] testing if the target URL content is stable
+[12:43:44] [INFO] testing if GET parameter 'limit' is dynamic
+[12:43:44] [WARNING] GET parameter 'limit' does not appear to be dynamic
+[12:43:44] [WARNING] heuristic (basic) test shows that GET parameter 'limit' might not be SQL injectable
+[12:43:45] [INFO] testing for SQL injection on GET parameter 'limit'
+[12:44:53] [WARNING] GET parameter 'limit' does not seem to be injectable
+[12:44:53] [INFO] testing if Cookie parameter 'chas_session' is dynamic
+[12:44:53] [WARNING] Cookie parameter 'chas_session' does not appear to be dynamic
+[12:44:54] [CRITICAL] not authorized, try to provide right HTTP authentication type and valid credentials (401). If this is intended, try to rerun by providing a valid value for option '--ignore-code'
+[12:44:54] [WARNING] HTTP error codes detected during run:

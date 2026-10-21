@@ -1,0 +1,4 @@
+VirusTotal result for CHAS Setup 0.7.0.exe (19 Oct 2026)
+SHA-256: e0b8b0814c83ad33a7f43592fa67aea6ac552a58b84a6cb98531c83cc40811a2
+https://www.virustotal.com/gui/file/e0b8b0814c83ad33a7f43592fa67aea6ac552a58b84a6cb98531c83cc40811a2
+73 engines listed: 0 malicious, 0 suspicious, 57 undetected, 10 timeout (1 confirmed), 6 unable to process file type

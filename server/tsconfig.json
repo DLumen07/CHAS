@@ -1,0 +1,28 @@
+/* What gets COMPILED into dist/ and shipped.
+
+   `src` only. The seed script deliberately imports the front-end's roster
+   generator (see prisma/seed.ts), which lives outside this package - so it
+   cannot be under this rootDir and is not part of the server build. It runs
+   through tsx, which does not care, and is type-checked separately by
+   tsconfig.seed.json. */
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src"]
+}

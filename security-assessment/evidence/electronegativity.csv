@@ -1,0 +1,7 @@
+issue, severity, confidence, filename, location, sample, description, url
+json","0:0",N/A,"Check if there are security patches applied in between the Electron version used and the latest",https://github.com/doyensec/electronegativity/wiki/AVAILABLE_SECURITY_FIXES_GLOBAL_CHECK
+CSP_GLOBAL_CHECK,"MEDIUM","CERTAIN","N/A","0:0",N/A,"No CSP has been detected in the target application",https://github.com/doyensec/electronegativity/wiki/CSP_GLOBAL_CHECK
+PERMISSION_REQUEST_HANDLER_GLOBAL_CHECK,"MEDIUM","CERTAIN","N/A","0:0",N/A,"Missing PermissionRequestHandler to limit specific permissions (e.g. openExternal) in response to events from particular origins.",https://github.com/doyensec/electronegativity/wiki/PERMISSION_REQUEST_HANDLER_GLOBAL_CHECK
+AUXCLICK_JS_CHECK,"MEDIUM","FIRM","main.js","103:14","const win = new BrowserWindow({","Limit navigation flows to untrusted origins. Middle-click may cause Electron to open a link within a new window",https://github.com/doyensec/electronegativity/wiki/AUXCLICK_JS_CHECK
+PRELOAD_JS_CHECK,"MEDIUM","FIRM","main.js","116:6","preload: path.join(__dirname, 'preload.cjs'),","Review the use of preload scripts",https://github.com/doyensec/electronegativity/wiki/PRELOAD_JS_CHECK
+AUXCLICK_JS_CHECK,"MEDIUM","FIRM","main.js","174:17","const splash = new BrowserWindow({","Limit navigation flows to untrusted origins. Middle-click may cause Electron to open a link within a new window",https://github.com/doyensec/electronegativity/wiki/AUXCLICK_JS_CHECK

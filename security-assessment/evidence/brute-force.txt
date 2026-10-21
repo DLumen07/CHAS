@@ -1,0 +1,14 @@
+12 sign-in attempts with a wrong password for 'admin', then the correct password
+attempt  1 (wrong):   HTTP 401
+attempt  2 (wrong):   HTTP 401
+attempt  3 (wrong):   HTTP 401
+attempt  4 (wrong):   HTTP 401
+attempt  5 (wrong):   HTTP 401
+attempt  6 (wrong):   HTTP 401
+attempt  7 (wrong):   HTTP 401
+attempt  8 (wrong):   HTTP 401
+attempt  9 (wrong):   HTTP 401
+attempt 10 (wrong):   HTTP 401
+attempt 11 (wrong):   HTTP 429
+attempt 12 (wrong):   HTTP 429
+attempt 13 (correct): HTTP 429  body: {"error":"Too many sign-in attempts. Wait fifteen minutes and try again."}

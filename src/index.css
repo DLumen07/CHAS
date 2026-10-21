@@ -1,0 +1,945 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   CHAS design tokens.
+
+   The app is an instrument, but it is an instrument a school nurse opens every
+   morning, so the chrome is warm and the data is not. Surfaces are soft white
+   cards floating on a light canvas; elevation is one shallow tinted shadow.
+   Colour still carries clinical meaning ONLY inside the data: the diverging
+   nutritional-status scale owns green, orange, rose and violet, and nothing
+   decorative is allowed to use them.
+
+   Locked decisions:
+   - Type: Plus Jakarta Sans for display, numerals and running text, bundled
+     with the build through @fontsource so nothing is fetched at runtime.
+     Cascadia/Consolas for codes. Segoe UI stays as the fallback.
+   - One accent: gold. Navy is structural. Status colours are a data scale.
+   - Decorative gradients draw from the navy / royal-blue / gold brand family
+     only. That is the whole reason the summary cards are not a rainbow.
+   - Radius: app shell 20px, cards 16px, controls 10px, chips 8px.
+   - Motion: hover and press feedback only.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Plus Jakarta Sans, variable weight 200-800, bundled (see main.tsx). One
+     family for headings, figures and text keeps the premium, even texture;
+     hierarchy comes from weight and size rather than from a second face. */
+  --font-display: 'Plus Jakarta Sans Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+
+  /* Blues are pulled toward the school seal's royal blue rather than the
+     generic navy they started as. 900 and 950 stay deep enough to carry white
+     text on a filled card; 600 and 700 carry the seal's actual hue. */
+  --color-navy-950: #071539;
+  --color-navy-900: #0e2464; /* 14.2:1 on white */
+  --color-navy-800: #16307f; /* 11.8:1 */
+  --color-navy-700: #1e3fa0; /*  8.4:1 */
+  --color-navy-600: #2b52c4; /* focus rings, active borders */
+  --color-navy-500: #4a71d8; /* gradient stop only, never text */
+  --color-navy-100: #dae2f8;
+  --color-navy-50: #eef2fd;
+
+  /* The seal's yellow, for FILLS ONLY. At 13.3:1 behind navy-950 text it is
+     the strongest "act here" signal in the app, and it is the school's own
+     colour. It can never be text: on white it sits at 1.2:1. */
+  --color-seal-yellow: #ffde17;
+  --color-seal-yellow-hover: #ffe64d;
+  --color-seal-yellow-active: #f0cc00;
+
+  /* Dark amber carries the same meaning where TEXT is needed. */
+  --color-gold-700: #8a5d0d; /* 6.4:1 on white */
+  --color-gold-600: #b87f1c;
+  --color-gold-500: #d99a2b;
+  --color-gold-400: #e8b155;
+  --color-gold-100: #fbeed2;
+
+  --color-ink: #0f172a;
+  --color-muted: #5a6b85;
+  --color-placeholder: #68768e; /* 4.59:1 on white. Lighter greys fail AA. */
+
+  /* The ground the whole app sits on.
+
+     It was #eef1f7 - seven percent down from white and nine points cooler on
+     the blue channel than the red, which is enough tint to read as a grey
+     panel rather than as paper. The cards then looked like white boxes on
+     grey instead of like a sheet with a little depth in it.
+
+     It is almost white now - about one and a half percent down, with three
+     points of blue. At this distance the fill is not what separates a card
+     from the ground; the card's shadow and hairline are, and the ground's
+     only job is to stop white-on-white from being literally the same colour.
+     Anything with more tint in it than this reads as grey rather than as
+     paper. */
+  --color-canvas: #fbfcfe;
+
+  /* The app's ground, behind the cards. Deliberately tinted now: the cards
+     carry no outline, so the step from this grey-blue up to their white is
+     what lifts them - together with the soft shadow below. `canvas` above
+     stays near-white for the insets inside dialogs. */
+  --color-ground: #eceff5;
+
+  /* The card surface. White: against the grey-blue ground it is the one
+     strong step that lifts a card, and navy text and the clinical colours
+     read most clearly on it. A tinted card on a tinted ground was tried and
+     left too little separation. Insets inside a card use --color-wash. */
+  --color-card: #ffffff;
+  --color-line: #e3e8f1;
+  --color-line-soft: #f0f3f9;
+  /* Quiet fill for hover rows, tab rails and inset wells inside white cards. */
+  --color-wash: #f5f7fc;
+
+  /* Nutritional status: a diverging scale. Undernutrition runs warm
+     (rose to orange), normal is green, overnutrition runs cool-violet.
+     Two problem directions must never be confusable at a glance.
+     Every value clears WCAG AA both as a white-on-fill bar label and as
+     chip text on its own 9% tint. */
+  --color-sw: #9f1239; /* Severely Wasted        8.02:1 on white */
+  --color-w: #b4400b; /* Wasted                 5.71:1 */
+  --color-n: #136c34; /* Normal                 6.52:1 */
+  --color-ow: #7c3aed; /* Overweight             5.70:1 */
+  --color-ob: #4c1d95; /* Obese                 10.95:1 */
+  --color-tall: #0369a1; /* Tall (height-for-age)  5.93:1 */
+
+  /* 18, not 16. A card corner reads as soft or as boxy well before it reads
+     as a measurement, and at 16 these panels sat on the boxy side of that
+     line - which is what made a page of them feel like a form rather than a
+     dashboard. Two pixels is the whole change; anything past about 20 starts
+     to look like a phone widget on a 1366px desktop. */
+  --radius-card: 18px;
+  --radius-control: 10px;
+  --radius-chip: 8px;
+
+  --ease-chas: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* --- Elevation ---------------------------------------------------------
+
+     Three steps, and every surface in the app picks one of them instead of
+     writing its own box-shadow. Before this there were six hand-tuned shadows
+     across the screens, no two of them agreeing on the tint or the spread,
+     which is the difference a reader registers as "assembled" rather than
+     "designed" without ever being able to name it.
+
+     All three are tinted with the brand navy rather than black. A neutral
+     shadow over a faintly blue ground goes grey and dirty; a shadow that
+     carries a little of the surface's own hue reads as depth.
+
+     REST is a card sitting on the ground. No outline: the tinted ground
+     holds the edge, and a soft wide drop lifts the card off it.
+     RAISED is that card under the cursor - a longer, softer drop. A lift,
+     not a jump.
+     OVERLAY is for things that leave the page: menus, popovers, dialogs.
+  ----------------------------------------------------------------------- */
+  --shadow-rest:
+    0 1px 2px rgba(14, 36, 100, 0.04), 0 10px 28px -14px rgba(14, 36, 100, 0.18);
+  --shadow-raised:
+    0 2px 4px rgba(14, 36, 100, 0.05), 0 18px 36px -16px rgba(14, 36, 100, 0.26);
+  --shadow-overlay:
+    0 0 0 1px rgba(14, 36, 100, 0.09), 0 18px 38px -14px rgba(4, 12, 36, 0.34);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  /* --- The focus ring, on everything a keyboard can reach ----------------
+
+     Before this, the only things in the app with a visible focus state were
+     the three Radix primitives. Every button, tile, nav item and table
+     control had suppressed the browser default and put nothing back, so
+     tabbing through a screen moved the caret through nowhere. That is a real
+     accessibility failure and it is also, precisely, the difference between
+     software that has been finished and software that has been assembled.
+
+     `:where()` so the whole rule has ZERO specificity. It is a floor, not a
+     law: any component that wants its own focus treatment - the text field
+     colours its border, the Radix menus draw their own - simply declares one
+     and wins without needing an override or an `!important`.
+
+     TWO rings, not one. The inner white separates the outer navy from
+     whatever fill the control has, so the same ring reads on a white card,
+     on the wash, on a gold button and on the navy sidebar. A single ring has
+     to be re-tuned per surface, which is how an app ends up with four.
+
+     box-shadow rather than outline, so it follows each control's own border
+     radius exactly - including the full pills. `:focus-visible` rather than
+     `:focus`, because this is for the keyboard: a ring that appears on every
+     mouse click reads as a bug to the person clicking. */
+  :where(a, button, [role='button'], summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 4px var(--color-navy-600);
+  }
+
+  body {
+    margin: 0;
+    color: var(--color-ink);
+    background: var(--color-ground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Desktop app: the page itself never scrolls or rubber-bands. Text stays
+       selectable - LRNs and stub IDs get copied out of this app constantly. */
+    overflow: hidden;
+  }
+
+  /* Display face for headings and numerals. */
+  h1,
+  h2,
+  h3,
+  .font-display,
+  .tnum {
+    font-family: var(--font-display);
+    font-stretch: 100%;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+
+  /* Tabular figures everywhere numbers are compared down a column. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #ccd5e4;
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b2bfd3;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Every interactive element gets a visible, consistent focus ring.
+     Non-negotiable: this app is operated heavily by keyboard + tab. */
+  :focus-visible {
+    outline: 2px solid var(--color-navy-600);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  /* The app ground. It was one white plane filling the window edge to edge,
+     with every card on it also white - separated, in theory, by a hairline
+     and a soft drop.
+
+     That worked while the content was panels with headers. It stopped working
+     when the roster became a wall of thirty cards: white on white gives a
+     card no edge of its own, so a shadow is the only thing saying where one
+     ends, and a portrait that straddles a card's top edge straddles a line
+     nobody can see - which reads as the portrait floating in a margin rather
+     than sitting on anything.
+
+     The ground is the canvas tint now, which is what --color-canvas was
+     defined for. Cards keep their white; the 4% they stand above the ground
+     is what makes them cards. */
+  .app-shell {
+    background: var(--color-ground);
+  }
+
+  /* Panels are white on the tinted ground, held by a hairline plus a soft
+     drop - not by a heavy border, which reads as a table cell rather than a
+     card. */
+  /* Text sitting directly on a photograph.
+
+     Used by the school overview's masthead, which runs the school's own
+     classroom photo full-bleed behind its figures. A scrim alone cannot carry
+     that: this photograph's luminance is around 0.75, so the alpha needed to
+     put 10.5px text over it at 4.5:1 also erases the picture.
+
+     The shadow does the other half of the work. It is local to each glyph, so
+     it lifts the text off whatever happens to be behind THAT letter - a white
+     uniform, a face, the dark blackboard - without touching the photograph.
+     Two shadows on purpose: a tight one for edge definition and a wide soft
+     one that darkens the field around the glyph.
+
+     Deliberately scoped to one component rather than offered as a utility. It
+     is a fix for text on a photograph, and text on a photograph should stay
+     rare enough to be argued for each time. */
+  .masthead-text,
+  .masthead-text * {
+    text-shadow:
+      0 1px 2px rgba(4, 12, 36, 0.72),
+      0 2px 10px rgba(4, 12, 36, 0.55);
+  }
+
+  .panel {
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    box-shadow: var(--shadow-rest);
+  }
+
+  /* The explicit form of the focus ring defined in @layer base below. The
+     components that set their own box-shadow - the buttons carry a fill and
+     a drop - need it at real specificity, because the zero-specificity
+     default loses to any shadow they declare themselves. */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 4px var(--color-navy-600);
+  }
+
+  /* Filled summary cards. Four tones of ONE family - three depths of the
+     seal's royal blue, plus the seal's yellow. Decorative colour never borrows
+     from the status scale, so a card can never be misread as a diagnosis. */
+  .card-deep {
+    background: linear-gradient(135deg, #1b3a92 0%, #0b1c4f 100%);
+    color: #fff;
+  }
+  .card-royal {
+    background: linear-gradient(135deg, #3560d4 0%, #1c3c99 100%);
+    color: #fff;
+  }
+  .card-bright {
+    background: linear-gradient(135deg, #5e8ef2 0%, #2f66d8 100%);
+    color: #fff;
+  }
+  /* Seal yellow cannot carry white text (1.2:1). This one takes navy ink. */
+  .card-gold {
+    background: linear-gradient(135deg, #ffe14a 0%, #f2b414 100%);
+    color: var(--color-navy-950);
+  }
+
+  /* Sign-in is the one dark surface in the app, and the global scrollbar
+     thumb above is a light grey chosen against the white canvas. On navy that
+     same thumb reads as a bright white rule ruled down the edge of the window
+     - the most conspicuous thing on the screen, on the screen that is meant
+     to be the calmest. Here it is a translucent white, so it belongs to the
+     ground it is sitting on. Border and clip come from the global rule. */
+  .scroll-on-navy::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    background-clip: content-box;
+  }
+  .scroll-on-navy::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+    background-clip: content-box;
+  }
+
+  /* A scrolling list under a sticky table header. Without this the scrollbar
+     runs the full height of the scroll box, so at the top of the list the
+     thumb sits on top of the column names and over the panel's rounded
+     corner. The track is inset by the header's height instead, which is the
+     one part of a webkit scrollbar that can be moved without replacing the
+     whole thing with a div. Height is the header's: 10px padding twice plus
+     a 14px line box. */
+  .scroll-below-header::-webkit-scrollbar-track {
+    margin-top: 36px;
+    margin-bottom: 6px;
+  }
+  /* The scrollbar gutter is part of the scroll box, not of the table, so the
+     header band stopped at the table's edge and left a white notch to the
+     right of the last column. The box paints the same band itself for its top
+     34px - its own background does not scroll with the content - and the
+     gutter is transparent, so the band now runs to the panel's edge. */
+  .scroll-below-header {
+    background: linear-gradient(
+      to bottom,
+      var(--color-wash) 0,
+      var(--color-wash) 35px,
+      var(--color-line) 35px,
+      var(--color-line) 36px,
+      #fff 36px
+    );
+  }
+
+  /* Sticky table header. It reads as a header because it is a tinted band
+     with a rule under it, not because its text is a paler grey than the data
+     - which is what it was, at 4.6:1 and 10px, and it disappeared. The
+     background and the rule go on the cells: a sticky <tr> does not paint its
+     own background in every engine. */
+  .th {
+    height: 36px;
+    background: var(--color-wash);
+    box-shadow: inset 0 -1px 0 0 var(--color-line);
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  /* Fit-to-panel preview of the half-sheet. transform, not `zoom`: `zoom` is
+     non-standard and does not scale reliably outside Chromium. The box below
+     reserves the scaled size so the panel does not keep the full 5.5in.
+
+     The factor is a variable because 0.82 of 8.5in is 670px, and at the
+     packaged window's 1180px minimum the preview panel is only about 530px
+     wide - the sheet ran off its own panel and had to be scrolled sideways to
+     see the right margin, which is exactly the thing this preview exists to
+     show. Below 1280px it steps down to 0.62. Paper is unaffected: the print
+     block below resets width, height and transform outright. */
+  /* The half-sheet, scaled to whatever column it has been given.
+
+     Two sizes now. The docked preview beside the print queue is a reference -
+     enough to see that the right name and the right meeting are on the paper -
+     and the modal is the sheet at a size somebody can actually read every
+     line of. Both scale the SAME markup that reaches the printer, so neither
+     can drift from what comes out. */
+  .slip-scale {
+    --slip-zoom: 0.32;
+    width: calc(8.5in * var(--slip-zoom));
+    height: calc(5.5in * var(--slip-zoom));
+  }
+  .slip-scale > * {
+    transform: scale(var(--slip-zoom));
+    transform-origin: top left;
+  }
+  @media (min-width: 1280px) {
+    .slip-scale {
+      --slip-zoom: 0.37;
+    }
+  }
+
+  /* The preview card on the slips screen: wider than the old column. */
+  .slip-scale--card {
+    --slip-zoom: 0.5;
+  }
+  @media (min-width: 1280px) {
+    .slip-scale--card {
+      --slip-zoom: 0.62;
+    }
+  }
+
+  /* Inside the print wizard, which is a narrow dialog at every width. */
+  .slip-scale--modal {
+    --slip-zoom: 0.54;
+  }
+
+  .slip-scale--full {
+    --slip-zoom: 0.78;
+  }
+  @media (min-width: 1280px) {
+    .slip-scale--full {
+      --slip-zoom: 0.92;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Print: the advisory slip half-sheet ----------------------------------
+   Paper carries the slips and nothing else. The app tree is not "mostly
+   hidden" with a pile of .no-print classes - it is taken out entirely, and
+   the sheets queued for printing are rendered into #print-root instead. That
+   is also what Electron's printToPDF captures, so the PDF and the printout
+   are the same document rather than two renderings that can drift apart.
+-------------------------------------------------------------------------- */
+#print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: 8.5in 5.5in;
+    margin: 0;
+  }
+  html,
+  body {
+    height: auto;
+    background: #fff;
+    overflow: visible;
+  }
+  /* Everything that is not #print-root, not just #root: dialogs and toasts
+     are portalled straight into <body>, and the slip wizard is still open
+     while its batch prints. */
+  body > *:not(#print-root),
+  .no-print {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    width: 8.5in !important;
+    height: 5.5in !important;
+    overflow: hidden;
+    /* The slip's header band and meeting card are backgrounds. Without this
+       the browser's print dialog drops them unless "Background graphics" is
+       ticked, and the white title would print white on white. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    break-after: page;
+    page-break-after: always;
+  }
+  /* Without this the last slip is followed by a blank sheet. */
+  .print-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* --- Documents, as opposed to slips -----------------------------------
+     The SF8 working copy is a wide table, not a half-sheet, so it takes a
+     NAMED page of its own rather than the @page above. A named page is the
+     only way one stylesheet can carry two paper sizes, and Electron's
+     printToPDF is asked to prefer the CSS size (see electron/main.cjs), so
+     the file and the printout agree. Legal, landscape: ten columns of a
+     class of thirty do not fit across letter width at a readable size.
+
+     Rows must not be split across a page break, and the header row repeats
+     on every sheet - a second page of a class list with no column headings
+     is a page nobody can read.
+  ---------------------------------------------------------------------- */
+  @page sf8 {
+    size: 13in 8.5in;
+    margin: 0.4in;
+  }
+  .print-doc {
+    page: sf8;
+  }
+  .print-doc table {
+    width: 100%;
+  }
+  .print-doc thead {
+    display: table-header-group;
+  }
+  .print-doc tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* The SF8 itself, as the PDF export draws it (src/components/Sf8Form.tsx).
+     Long bond (8.5in x 13in) landscape with quarter-inch margins: the paper
+     the form was designed for, and the size it fits at without shrinking. */
+  @page sf8form {
+    size: 13in 8.5in;
+    margin: 0.25in;
+  }
+  .sf8-form {
+    page: sf8form;
+  }
+  /* Pages are decided by `paginate` in Sf8Form.tsx, so each one ends in a
+     break of its own and the printer never has to choose where. */
+  .sf8-form .sf8-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  .sf8-form .sf8-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* One learner's record (src/components/RecordPrint.tsx). Letter, portrait,
+     half-inch margins. Its pages are decided by `paginate` there, as the
+     SF8's are. */
+  @page record {
+    size: 8.5in 11in;
+    margin: 0.5in;
+  }
+  .rec-doc {
+    page: record;
+  }
+  .rec-doc .rec-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  .rec-doc .rec-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
+/* --- The learner record ---------------------------------------------------
+   A school form: black on white, Arial, ruled tables with a grey heading
+   row. Shown in the preview and inside #print-root. Every gap is padding
+   inside a block rather than a margin between blocks, so the height measured
+   for each block is all the room it takes on the page. */
+.rec-doc {
+  color: #000;
+  background: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.3;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rec-doc .rec-page {
+  position: relative;
+  width: 7.5in;
+  height: 10in;
+  overflow: hidden;
+}
+.rec-doc .rec-head {
+  padding-bottom: 4pt;
+}
+.rec-doc .rec-letterhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12pt;
+  padding-bottom: 6pt;
+  border-bottom: 1.5pt solid #000;
+}
+.rec-doc .rec-letterhead img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.rec-doc .rec-school {
+  flex: 1;
+  text-align: center;
+  font-size: 9pt;
+  line-height: 1.25;
+}
+.rec-doc .rec-school-name {
+  font-size: 12pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding-top: 2pt;
+}
+/* The app gives headings its display face; the form keeps Arial throughout. */
+.rec-doc h1,
+.rec-doc h2 {
+  font-family: inherit;
+}
+.rec-doc .rec-title {
+  margin: 0;
+  padding: 10pt 0 8pt;
+  text-align: center;
+  font-size: 13pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rec-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.rec-doc th,
+.rec-doc td {
+  border: 0.75pt solid #000;
+  padding: 2.5pt 4pt;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.rec-doc .rec-info th {
+  background: #e6e6e6;
+  font-weight: 700;
+}
+.rec-doc .rec-name {
+  font-size: 11pt;
+  font-weight: 700;
+}
+.rec-doc .rec-mono {
+  font-family: Consolas, 'Courier New', monospace;
+  letter-spacing: 0.03em;
+}
+.rec-doc .rec-table thead th {
+  background: #e6e6e6;
+  font-size: 8.5pt;
+  font-weight: 700;
+  vertical-align: bottom;
+}
+.rec-doc .rec-section {
+  margin: 0;
+  padding: 12pt 0 4pt;
+  font-size: 10.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.rec-doc .rec-empty {
+  margin: 0;
+  padding: 3pt 4pt;
+  border: 0.75pt solid #000;
+  font-style: italic;
+}
+.rec-doc .rec-text {
+  margin: 0;
+  padding: 5pt 0 0;
+  white-space: pre-line;
+}
+.rec-doc .rec-end {
+  margin: 0;
+  padding: 14pt 0 0;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rec-doc .rec-sign {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 40pt;
+  padding-top: 22pt;
+}
+.rec-doc .rec-sign-label {
+  font-size: 9pt;
+}
+.rec-doc .rec-sign-line {
+  height: 26pt;
+  border-bottom: 0.75pt solid #000;
+}
+.rec-doc .rec-sign-role {
+  padding-top: 2pt;
+  text-align: center;
+  font-size: 9pt;
+}
+.rec-doc .rec-sign-date {
+  grid-column: 1 / -1;
+  padding-top: 14pt;
+  font-size: 9pt;
+}
+.rec-doc .rec-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 4pt;
+  border-top: 0.5pt solid #000;
+  font-size: 8pt;
+}
+
+/* --- The SF8 form --------------------------------------------------------
+   Plain CSS rather than utilities, because this is a spreadsheet's cell
+   styles written out: thin and medium borders per edge, the form's two fills,
+   Arial Narrow. Only ever shown inside #print-root. */
+.sf8-form {
+  color: #000;
+  background: #fff;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-stretch: condensed;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sf8-form table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.sf8-form td {
+  padding: 0 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.1;
+}
+.sf8-form thead {
+  display: table-header-group;
+}
+.sf8-form tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.sf8-form .closing {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.sf8-form .learners td {
+  border: 0.75pt solid #000;
+}
+/* The title block: seal, title and wordmark as one centred group. */
+.sf8-form .sf8-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4in;
+  padding: 0.05in 0 0.12in;
+}
+.sf8-form .sf8-code {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 9pt;
+}
+.sf8-form .sf8-seal {
+  width: 1.2in;
+  height: 1.2in;
+}
+.sf8-form .sf8-wordmark {
+  width: 1.7in;
+  height: auto;
+}
+.sf8-form .sf8-heading {
+  text-align: center;
+  line-height: 1.2;
+}
+.sf8-form .sf8-dept {
+  font-size: 17pt;
+  font-weight: 700;
+}
+.sf8-form .sf8-name {
+  font-size: 19pt;
+  font-weight: 700;
+}
+.sf8-form .sf8-levels {
+  font-size: 12pt;
+  font-style: italic;
+}
+.sf8-form .c { text-align: center; }
+.sf8-form .r { text-align: right; }
+.sf8-form .l { text-align: left; }
+.sf8-form .top { vertical-align: top; }
+.sf8-form .bold { font-weight: 700; }
+.sf8-form .ital { font-style: italic; }
+.sf8-form .wrap { white-space: normal; }
+.sf8-form .arial { font-family: Arial, sans-serif; font-stretch: normal; }
+.sf8-form .name { text-overflow: clip; }
+.sf8-form .in { background: #deeaf6; }
+.sf8-form .sex { background: #d0cece; font-weight: 700; font-style: italic; }
+/* ----- NOTHING FOLLOWS -----: the words centred, dashes filling each side. */
+.sf8-form .sf8-end-line { display: flex; align-items: center; padding: 0 2px; font-weight: 700; line-height: 1.1; white-space: nowrap; }
+.sf8-form .sf8-end { display: flex; flex: 1; align-items: center; gap: 0.5em; min-width: 0; }
+.sf8-form .sf8-dash { flex: 1 1 0; min-width: 0; overflow: hidden; }
+/* The left run is clipped from its far end, so its dashes meet the words. */
+.sf8-form .sf8-dash-l { direction: rtl; }
+.sf8-form .box { border: 0.75pt solid #000; }
+.sf8-form .bl { border-left: 0.75pt solid #000; }
+.sf8-form .bb { border-bottom: 0.75pt solid #000; }
+/* Rows 4-8 of the closing table are the summary table, ruled throughout. */
+.sf8-form .closing tr:nth-child(n + 4):nth-child(-n + 8) td { border: 0.75pt solid #000; }
+.sf8-form .Bl { border-left: 1.5pt solid #000 !important; }
+.sf8-form .Br { border-right: 1.5pt solid #000 !important; }
+.sf8-form .Bt { border-top: 1.5pt solid #000 !important; }
+.sf8-form .Bb { border-bottom: 1.5pt solid #000 !important; }
+
+@layer components {
+  /* --- The learner card: two layers, and they cannot be one -----------------
+     The portrait sits IN the top edge, so the edge curves around it. A
+     radial-gradient mask punches that notch out and the ground shows through.
+
+     The mask and the shadow MUST live on separate elements. `mask-clip`
+     defaults to border-box and the mask is applied AFTER the filter, so a
+     drop-shadow on the masked element is clipped away to a sliver at the
+     card edge. That is not a tuning problem and no amount of alpha fixes it -
+     the shadow is simply not being painted. Hence:
+
+       .learner-lift     outer, filter only, never masked
+       .learner-surface  inner, mask only, no filter
+
+     drop-shadow on the outer traces the alpha of what it contains, which is
+     the masked shape - so the shadow still follows the notch, which is the
+     whole reason it is a filter rather than a box-shadow.
+  -------------------------------------------------------------------------- */
+  .learner-surface {
+    --notch: 37px;
+    -webkit-mask-image: radial-gradient(
+      circle at 50% 0,
+      transparent var(--notch),
+      #000 calc(var(--notch) + 1px)
+    );
+    mask-image: radial-gradient(
+      circle at 50% 0,
+      transparent var(--notch),
+      #000 calc(var(--notch) + 1px)
+    );
+  }
+
+  /* The lift, and nothing but the lift.
+
+     There used to be two stacked zero-blur drop-shadows in front of these,
+     faking a hairline. They had to go: the second one shadows the RESULT of
+     the first, so the alpha accumulates wherever the outline curves - worst
+     in the concave arc of the notch, and again at the corners - and the card
+     came out with a heavy dark line exactly where it should have been
+     lightest. A fake border drawn with shadows is not uniform on a curve.
+
+     Nothing replaces it. Now that the mask is no longer clipping the filter,
+     the lift alone gives the card its edge, which is what a lift is for.
+
+     These are NOT box-shadow numbers: a drop-shadow blur spreads about twice
+     as far as the same figure in a box-shadow, so the blurs are roughly
+     halved and the alphas raised to match. */
+  /* Lighter than it was: 0.16/0.14 became 0.10/0.07 and the ambient blur
+     tightened from 6px to 5px.
+
+     The old figures were tuned when the wall ran six cards across, where each
+     one is small and its shadow is a thin seam. At four columns the cards are
+     half as wide again, the same alpha covers a much larger area, and thirty
+     of them stacked up into a grey haze over the whole grid. A lift should be
+     the thing that separates a card from the ground, not something a reader
+     can see on its own. */
+  .learner-lift {
+    filter: drop-shadow(0 1px 1px rgba(14, 36, 100, 0.1))
+      drop-shadow(0 3px 5px rgba(14, 36, 100, 0.07));
+    transition: filter 100ms var(--ease-chas);
+  }
+
+  .group:active .learner-lift {
+    filter: drop-shadow(0 1px 1px rgba(14, 36, 100, 0.13));
+  }
+
+  /* An empty seat has no lift to give it an edge, so it is recessed by fill
+     instead - a few percent below the ground rather than above it. That reads
+     as a gap in the wall, which is what it is, and it needs no outline at all
+     so there is no curve for one to pile up on. */
+  .learner-lift--empty {
+    filter: none;
+  }
+
+  /* The picked card, still readable behind its own dialog. One navy shadow,
+     not a stack of them, for the same reason as above. */
+  .learner-lift--selected {
+    filter: drop-shadow(0 0 1px var(--color-navy-600))
+      drop-shadow(0 4px 5px rgba(14, 36, 100, 0.22))
+      drop-shadow(0 12px 14px rgba(14, 36, 100, 0.18));
+  }
+
+}
+
+/* Toasts (components/toast.tsx) and the page loader rise in gently.
+   Both are skipped for anyone who has asked the system for less motion. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes loader-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[toast-in_180ms_ease-out\],
+  .animate-\[loader-in_200ms_ease-out_300ms_both\] {
+    animation: none;
+  }
+}
