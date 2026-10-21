@@ -312,6 +312,34 @@ export function LearnerRecordDialog({
     }
   }
 
+  /* Deleting asks first, over the record, the same way discarding an edit
+     does. It is for a learner entered by mistake - see the note on the
+     DELETE route - so the prompt says what goes with them. */
+  const [askDelete, setAskDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function remove() {
+    setSaveError(null)
+    setDeleting(true)
+    try {
+      await endpoints.deleteLearner(l.id)
+      /* Pulled again, not patched: the learner leaves every count on every
+         screen, and the roster is what those are counted from. Once it
+         lands the screen behind no longer has this learner to show, and the
+         record closes. */
+      await refresh()
+      onSaved()
+      setAskDelete(false)
+      closeRef.current?.click()
+      toast.success(`${l.firstName} ${l.lastName} was deleted.`)
+    } catch (err) {
+      setAskDelete(false)
+      setSaveError(err instanceof ApiError ? err.message : 'Unable to delete this learner.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   /* --- The sheet -------------------------------------------------------- */
 
   return (
@@ -340,6 +368,14 @@ export function LearnerRecordDialog({
           discarding.current = false
         }}
       />
+      {askDelete && (
+        <DeletePrompt
+          name={`${l.firstName} ${l.lastName}`}
+          deleting={deleting}
+          onKeep={() => setAskDelete(false)}
+          onDelete={() => void remove()}
+        />
+      )}
       <ModalClose ref={closeRef} className="hidden" tabIndex={-1} aria-hidden />
       {/* The sheet prints the name as its heading; the dialog still needs its
           own accessible title, present while the record is loading too. */}
@@ -413,6 +449,16 @@ export function LearnerRecordDialog({
       <footer className="shrink-0 border-t border-line px-8 py-4">
         {saveError && <Alert className="mb-3">{saveError}</Alert>}
         <div className="flex items-center justify-end gap-2.5">
+          {!editing && record && (
+            <button
+              type="button"
+              onClick={() => setAskDelete(true)}
+              className="mr-auto flex h-10 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-medium text-[#9f1239] transition-colors duration-100 hover:bg-[#fdf2f5]"
+            >
+              <Trash size={14} weight="bold" />
+              Delete learner
+            </button>
+          )}
           {editing ? (
             <>
               <Button className="h-10 px-5" onClick={() => setDraft(null)} disabled={saving}>
@@ -1157,6 +1203,65 @@ function EditCard({
         </button>
       </div>
       <div className="space-y-3">{children}</div>
+    </div>
+  )
+}
+
+/* "Are you sure" over the record, shaped like the discard prompt. Keep is the
+   focused button, so Enter on a stray keypress keeps the learner. */
+function DeletePrompt({
+  name,
+  deleting,
+  onKeep,
+  onDelete,
+}: {
+  name: string
+  deleting: boolean
+  onKeep: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="Delete this learner?"
+      className="absolute inset-0 z-20 grid place-items-center bg-white/70 backdrop-blur-[1px]"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          if (!deleting) onKeep()
+        }
+      }}
+    >
+      <div className="w-[400px] max-w-[90%] rounded-[16px] bg-white p-5 shadow-[0_18px_50px_-12px_rgba(4,12,36,0.45),0_0_0_1px_rgba(14,36,100,0.08)]">
+        <h3 className="text-[15px] font-semibold text-navy-900">Delete {name}?</h3>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+          This permanently removes the learner and everything recorded for them: measurements, invitation
+          slips, attendance, health history and immunization card. It cannot be undone.
+        </p>
+        <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
+          Use this only for a learner added by mistake or added twice.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="h-9 rounded-[10px] px-3.5 text-[12.5px] font-medium text-[#9f1239] transition-colors duration-100 hover:bg-[#fdf2f5] disabled:opacity-60"
+          >
+            {deleting ? 'Deleting…' : 'Delete learner'}
+          </button>
+          <button
+            type="button"
+            autoFocus
+            onClick={onKeep}
+            disabled={deleting}
+            className="h-9 rounded-[10px] bg-navy-900 px-3.5 text-[12.5px] font-semibold text-white transition-colors duration-100 hover:bg-navy-800 disabled:opacity-60"
+          >
+            Keep learner
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

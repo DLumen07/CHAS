@@ -604,6 +604,9 @@ export const endpoints = {
      note on EditLearnerBody. */
   updateLearner: (id: string, body: EditLearnerBody) =>
     api.put<{ ok: true }>(`/learners/${id}`, body),
+  /* Removing a learner entered by mistake, and everything recorded against
+     them. Permanent - see the note on the route. */
+  deleteLearner: (id: string) => api.del<void>(`/learners/${id}`),
   /* What the registration dialog may offer: the school year and the
      classes this account may enrol into. */
   enrolmentOptions: () => api.get<ApiEnrolmentOptions>('/learners/options'),

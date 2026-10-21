@@ -1019,3 +1019,60 @@ learnersRouter.put(
     res.json({ ok: true })
   }),
 )
+
+/* --- Deleting a learner ---------------------------------------------------
+
+   FOR A RECORD THAT SHOULD NEVER HAVE BEEN MADE: a learner enrolled twice, a
+   spreadsheet imported into the wrong class, a test entry. It is not how a
+   learner leaves the school - a learner who transfers out or finishes Grade 6
+   is archived (the rollover, or POST /learners/:id/archive) and keeps their
+   record under Former learners, because that record is still the school's.
+
+   Deleting is permanent. Every table that holds something about the child
+   (measurements and their revisions, absences, immunization checks, slips,
+   enrolments, guardians, conditions, doses, feeding beneficiaries) cascades
+   from the learner row, so the one delete removes all of it, and nothing is
+   left behind pointing at an id that no longer exists. A follow-up weigh-in's
+   `learnerIds` may still list it; that list is only ever read as a filter
+   over the roster, so a stale id there matches nobody.
+
+   The audit entry keeps the counts of what went with it, never the name or
+   LRN - see lib/audit.ts. */
+
+learnersRouter.delete(
+  '/:id',
+  h(async (req, res) => {
+    const actor = actorOf(req)
+    const id = z.string().min(1).safeParse(req.params.id)
+    if (!id.success) throw notFound('That learner was not found.', 'NO_LEARNER')
+
+    const existing = await db.learner.findFirst({
+      where: { id: id.data, ...learnerScope(actor) },
+      select: {
+        id: true,
+        sectionId: true,
+        archivedAt: true,
+        _count: { select: { measurements: true, slips: true } },
+      },
+    })
+    if (!existing) throw notFound('That learner was not found.', 'NO_LEARNER')
+
+    await db.learner.delete({ where: { id: existing.id } })
+
+    audit({
+      actorId: actor.id,
+      action: 'LEARNER_DELETED',
+      targetType: 'learner',
+      targetId: existing.id,
+      detail: {
+        sectionId: existing.sectionId,
+        archived: existing.archivedAt !== null,
+        measurements: existing._count.measurements,
+        slips: existing._count.slips,
+      },
+      ipAddress: ipOf(req),
+    })
+
+    res.status(204).end()
+  }),
+)
