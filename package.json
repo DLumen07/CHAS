@@ -1,6 +1,6 @@
 {
   "name": "chas",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": true,
   "description": "CHAS — Child Health Assessment System. Offline nutritional status monitoring and print-bridge reporting for Detailen Elementary School, Maria Aurora, Aurora.",
   "main": "electron/main.cjs",
