@@ -624,7 +624,13 @@ export function RecordPreview({ learnerId, onClose }: { learnerId: string; onClo
         [...(root?.querySelectorAll('img') ?? [])].map((img) => img.decode().catch(() => undefined)),
       )
       if (mode === 'paper') {
-        printPaper()
+        const res = await printPaper('Learner record')
+        if (res.ok) {
+          toast.success('The record was sent to the printer.')
+          onClose()
+        } else if (res.reason === 'error') {
+          toast.error('The record could not be printed. Try again.')
+        }
         return
       }
       const res = await savePdf(recordFileName(d.record), 'Save learner record')
@@ -632,7 +638,7 @@ export function RecordPreview({ learnerId, onClose }: { learnerId: string; onClo
         toast.success(`Saved to ${res.path}`)
         onClose()
       } else if (res.reason === 'unavailable') {
-        printPaper()
+        void printPaper()
       } else if (res.reason === 'error') {
         toast.error('The PDF could not be saved. Try again.')
       }

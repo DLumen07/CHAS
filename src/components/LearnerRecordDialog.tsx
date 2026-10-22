@@ -64,6 +64,7 @@ import {
 import { refresh } from '../lib/server-records'
 import { todayIso } from '../lib/dates'
 import { cached } from '../lib/query'
+import { nameError } from '../lib/names'
 
 /* One learner, everything the school holds on them.
 
@@ -245,7 +246,11 @@ export function LearnerRecordDialog({
     const e: Record<string, string> = {}
     if (!/^\d{12}$/.test(d.lrn)) e.lrn = 'The LRN must be 12 digits.'
     if (!d.lastName.trim()) e.lastName = 'The surname is required.'
+    else if (nameError(d.lastName, 'surname')) e.lastName = nameError(d.lastName, 'surname')!
     if (!d.firstName.trim()) e.firstName = 'The first name is required.'
+    else if (nameError(d.firstName, 'first name')) e.firstName = nameError(d.firstName, 'first name')!
+    if (nameError(d.middleName, 'middle name')) e.middleName = nameError(d.middleName, 'middle name')!
+    if (nameError(d.nameExt, 'name extension')) e.nameExt = nameError(d.nameExt, 'name extension')!
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d.birthDate)) e.birthDate = 'Enter the date of birth.'
     d.conditions.forEach((c, i) => {
       if (!c.condition.trim()) e[`c${i}`] = 'Enter the condition.'
@@ -840,6 +845,7 @@ function EditForm({
             label="Middle name"
             value={draft.middleName}
             onChange={(v) => set('middleName', v)}
+            error={errors.middleName}
           />
         </FormRow>
         <FormRow>
@@ -854,6 +860,7 @@ function EditForm({
             value={draft.nameExt}
             onChange={(v) => set('nameExt', v.slice(0, 16))}
             placeholder="Jr."
+            error={errors.nameExt}
           />
         </FormRow>
         <Fieldset label={<>Sex{REQ}</>}>

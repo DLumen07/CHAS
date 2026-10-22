@@ -17,7 +17,7 @@ import {
   IdentificationBadge,
   PencilSimple,
 } from '@phosphor-icons/react'
-import { Button, Empty, Field, PILL, PILL_OFF, PILL_ON, cx } from '@/components/ui'
+import { Button, Empty, Field, PILL, PILL_OFF, PILL_ON, PasswordField, cx } from '@/components/ui'
 import {
   ConfirmDialog,
   Modal,
@@ -28,6 +28,7 @@ import {
   Select,
 } from '@/components/primitives'
 import { Y } from '@/components/bento'
+import { nameError } from '@/lib/names'
 import { Navigate } from 'react-router-dom'
 import { useQuery } from '@/lib/query'
 import { ApiError, endpoints, type ApiRole, type ApiStaff } from '@/lib/api'
@@ -806,6 +807,7 @@ function AddAccountModal({
   const [usernameTyped, setUsernameTyped] = useState<string | null>(null)
   const [role, setRole] = useState<ApiRole>('NURSE')
   const [pass, setPass] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -816,6 +818,7 @@ function AddAccountModal({
     setUsernameTyped(null)
     setRole('NURSE')
     setPass('')
+    setConfirm('')
     setError(null)
   }, [open])
 
@@ -829,12 +832,20 @@ function AddAccountModal({
   async function create() {
     if (!name.first.trim()) return setError('Enter the first name.')
     if (!name.last.trim()) return setError('Enter the last name.')
+    for (const [v, label] of [
+      [name.first, 'first name'],
+      [name.middle, 'middle name'],
+      [name.last, 'last name'],
+    ] as const) {
+      if (nameError(v, label)) return setError(nameError(v, label)!)
+    }
     if (username.length < 3) return setError('The username needs at least three characters.')
     /* The server's rule (routes/users.ts), checked here so the head hears
        it before the request. */
     if (!/^[a-z0-9._-]+$/.test(username))
       return setError('Usernames are lowercase letters, digits, dots, dashes and underscores.')
     if (pass.length < 12) return setError('The password needs at least twelve characters.')
+    if (pass !== confirm) return setError('The two passwords do not match.')
     setError(null)
     setBusy(true)
     try {
@@ -920,16 +931,37 @@ function AddAccountModal({
         </p>
       </div>
 
-      <Field
-        label="First password"
-        placeholder="At least twelve characters"
-        autoComplete="off"
-        value={pass}
-        leading={<LockKey size={16} weight="fill" />}
-        inputClassName={MODAL_FIELD}
-        onChange={(e) => setPass(e.target.value)}
-        hint="Give this password to the staff member. It will not be shown again."
-      />
+      <div>
+        <div className="grid grid-cols-2 gap-3">
+          <PasswordField
+            label="First password"
+            placeholder="At least twelve characters"
+            autoComplete="new-password"
+            value={pass}
+            leading={<LockKey size={16} weight="fill" />}
+            inputClassName={MODAL_FIELD}
+            onChange={(e) => {
+              setPass(e.target.value)
+              setError(null)
+            }}
+          />
+          <PasswordField
+            label="Confirm password"
+            placeholder="Type it again"
+            autoComplete="new-password"
+            value={confirm}
+            leading={<LockKey size={16} weight="fill" />}
+            inputClassName={MODAL_FIELD}
+            onChange={(e) => {
+              setConfirm(e.target.value)
+              setError(null)
+            }}
+          />
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted">
+          Give this password to the staff member. It will not be shown again.
+        </p>
+      </div>
     </FormModal>
   )
 }
@@ -968,6 +1000,7 @@ function EditAccountModal({
     if (!user) return
     const name = fullName.trim()
     if (name.length < 2) return setError('Enter the name.')
+    if (nameError(name, 'name')) return setError(nameError(name, 'name')!)
     if (username.length < 3) return setError('The username needs at least three characters.')
     if (!/^[a-z0-9._-]+$/.test(username))
       return setError('Usernames are lowercase letters, digits, dots, dashes and underscores.')
@@ -1065,17 +1098,20 @@ function PasswordModal({
   onSaved: (u: ApiStaff, password: string) => Promise<void>
 }) {
   const [pass, setPass] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setPass('')
+    setConfirm('')
     setError(null)
   }, [user])
 
   async function save() {
     if (!user) return
     if (pass.length < 12) return setError('The password needs at least twelve characters.')
+    if (pass !== confirm) return setError('The two passwords do not match.')
     setBusy(true)
     try {
       await endpoints.resetStaffPassword(user.id, pass)
@@ -1098,15 +1134,30 @@ function PasswordModal({
       busy={busy}
       onSubmit={() => void save()}
     >
-      <Field
+      <PasswordField
         label="New password"
         placeholder="At least twelve characters"
-        autoComplete="off"
+        autoComplete="new-password"
         autoFocus
         value={pass}
         leading={<LockKey size={16} weight="fill" />}
         inputClassName={MODAL_FIELD}
-        onChange={(e) => setPass(e.target.value)}
+        onChange={(e) => {
+          setPass(e.target.value)
+          setError(null)
+        }}
+      />
+      <PasswordField
+        label="Confirm new password"
+        placeholder="Type it again"
+        autoComplete="new-password"
+        value={confirm}
+        leading={<LockKey size={16} weight="fill" />}
+        inputClassName={MODAL_FIELD}
+        onChange={(e) => {
+          setConfirm(e.target.value)
+          setError(null)
+        }}
         hint="Give this password to the staff member. It will not be shown again."
       />
     </FormModal>

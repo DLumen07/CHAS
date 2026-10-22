@@ -140,8 +140,10 @@ export default function SF8() {
     setBusy(true)
     try {
       if (mode === 'paper') {
-        printPaper()
-        setNote({ tone: 'warn', text: `The print window for the ${current} SF8 is open.` })
+        const res = await printPaper(`SF8 · ${current}`)
+        if (res.ok) setNote({ tone: 'ok', text: `The ${current} SF8 was sent to the printer.` })
+        else if (res.reason === 'error') setNote({ tone: 'warn', text: 'The SF8 could not be printed. Try again.' })
+        else setNote(null)
         return
       }
       /* The header pictures are data: URLs, but a picture still has to be
@@ -164,7 +166,7 @@ export default function SF8() {
         setNote(null)
       } else if (res.reason === 'unavailable') {
         setPreview(null)
-        printPaper()
+        void printPaper()
         setNote({
           tone: 'warn',
           text: 'Choose “Save as PDF” in the print window to save the SF8.',

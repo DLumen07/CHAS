@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, session } = require('electron')
 const store = require('./store.cjs')
+const { printWithPreview, registerPrintPreview } = require('./print-preview.cjs')
 const fs = require('node:fs/promises')
 const { existsSync, appendFileSync, mkdirSync } = require('node:fs')
 const path = require('node:path')
@@ -267,6 +268,18 @@ if (!app.requestSingleInstanceLock()) {
         return { ok: true, path: chosen.filePath }
       } catch (err) {
         console.error('[chas] could not write the slip PDF', err)
+        return { ok: false, reason: 'error', message: String(err && err.message) }
+      }
+    })
+
+    /* Print with a preview first (print-preview.cjs). The Windows print
+       dialog that window.print() opened could not show one. */
+    registerPrintPreview()
+    ipcMain.handle('chas:print:paper', async (event, opts = {}) => {
+      try {
+        return await printWithPreview(event.sender, opts)
+      } catch (err) {
+        console.error('[chas] could not open the print preview', err)
         return { ok: false, reason: 'error', message: String(err && err.message) }
       }
     })

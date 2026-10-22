@@ -6,6 +6,7 @@ import { Modal, ModalContent, ModalDescription, ModalTitle } from '@/components/
 import { ApiError, endpoints, type ApiUser } from '@/lib/api'
 import { useQuery } from '@/lib/query'
 import { schoolIdentity } from '@/lib/school-year'
+import { printPaper } from '@/lib/print'
 
 /* Recovery codes: each account's own way back in when a password is
    forgotten, head and nurse alike. They work without internet.
@@ -169,7 +170,7 @@ export function RecoveryCodesDialog({
               </label>
 
               <div className="mt-6 flex justify-between gap-2">
-                <button type="button" className={BTN_SECONDARY} onClick={() => window.print()}>
+                <button type="button" className={BTN_SECONDARY} onClick={() => void printPaper('Recovery codes')}>
                   <Printer size={15} weight="bold" />
                   Print
                 </button>

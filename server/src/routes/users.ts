@@ -116,15 +116,24 @@ const takenAs = (username: string) => (err: unknown) => {
   throw err
 }
 
+/* Letters, spaces, hyphens, apostrophes and periods - the learner name rule
+   (2026-10-22), so "Mrs. A. Bantolo" passes and a name with digits does not. */
+const FullName = z
+  .string()
+  .trim()
+  .min(2, 'Enter the name as it appears on DepEd forms.')
+  .max(120)
+  .regex(/^\p{L}[\p{L}\p{M} .'’-]*$/u, 'The name can only have letters, spaces, hyphens, apostrophes and periods.')
+
 const CreateUser = z.object({
-  fullName: z.string().trim().min(2, 'Enter the name as it appears on DepEd forms.').max(120),
+  fullName: FullName,
   username: Username.optional(),
   password: Passphrase,
   role: z.enum(['ADMIN', 'NURSE']).default('NURSE'),
 })
 
 const UpdateUser = z.object({
-  fullName: z.string().trim().min(2).max(120).optional(),
+  fullName: FullName.optional(),
   username: Username.optional(),
   role: z.enum(['ADMIN', 'NURSE']).optional(),
   /** true disables the account, false restores it. */

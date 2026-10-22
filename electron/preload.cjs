@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('chas', {
   print: {
     /** Render the current page under the print stylesheet and save it. */
     pdf: (opts) => ipcRenderer.invoke('chas:print:pdf', opts),
+    /** Show the printout in a preview window and print it from there. */
+    paper: (opts) => ipcRenderer.invoke('chas:print:paper', opts),
   },
   backup: {
     /** Whether this is the installed app, and how the last restore went. */

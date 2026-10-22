@@ -190,9 +190,13 @@ export default function Slips() {
     const plural = count === 1 ? '' : 's'
     try {
       if (j.mode === 'paper') {
-        printPaper()
-        stamp(j.sheets)
-        toast.success(`Sent ${count} slip${plural} to the printer.`)
+        const res = await printPaper(`Advisory slip${plural}`)
+        if (res.ok) {
+          stamp(j.sheets)
+          toast.success(`Sent ${count} slip${plural} to the printer.`)
+        } else if (res.reason === 'error') {
+          toast.error('The slips could not be printed. Try again.')
+        }
         return
       }
       const res = await savePdf(pdfFileName(count, j.sheets[0]?.stubId ?? null, TODAY))
@@ -202,7 +206,7 @@ export default function Slips() {
       } else if (res.reason === 'unavailable') {
         /* A plain browser in development: the print dialog's own "Save as
            PDF" destination is the fallback, and it is honest to say so. */
-        printPaper()
+        void printPaper()
         stamp(j.sheets)
         toast.info('Choose “Save as PDF” in the print window to save the file.')
       } else if (res.reason !== 'canceled') {

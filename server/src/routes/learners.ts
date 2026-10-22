@@ -336,15 +336,26 @@ const optionalText = (max: number) =>
     .optional()
     .transform((v) => (v ? v : undefined))
 
+/* A learner's name is letters (ñ and accented letters included), spaces,
+   hyphens, apostrophes and periods - no digits or other symbols
+   (2026-10-22, the user's request). Same rule as src/lib/names.ts. */
+const NAME = /^\p{L}[\p{L}\p{M} .'’-]*$/u
+const nameRule = (label: string) =>
+  `The ${label} can only have letters, spaces, hyphens, apostrophes and periods.`
+const requiredName = (label: string, max: number) =>
+  z.string().trim().min(1, `The ${label} is required.`).max(max).regex(NAME, nameRule(label))
+const optionalName = (label: string, max: number) =>
+  optionalText(max).refine((v) => v === undefined || NAME.test(v), nameRule(label))
+
 const NewLearner = z.object({
   /* Twelve digits. Checked as a shape rather than against a checksum: DepEd
      publishes no check digit for the LRN, so a stricter rule here would be
      invented and would reject valid numbers. */
   lrn: z.string().trim().regex(/^\d{12}$/, 'The LRN must be 12 digits.'),
-  lastName: z.string().trim().min(1, 'The surname is required.').max(80),
-  firstName: z.string().trim().min(1, 'The first name is required.').max(80),
-  middleName: optionalText(80),
-  nameExt: optionalText(16),
+  lastName: requiredName('surname', 80),
+  firstName: requiredName('first name', 80),
+  middleName: optionalName('middle name', 80),
+  nameExt: optionalName('name extension', 16),
   sex: z.enum(['M', 'F']),
   birthDate: isoDay,
 
@@ -852,10 +863,10 @@ const EditRow = {
 
 const EditLearner = z.object({
   lrn: z.string().trim().regex(/^\d{12}$/, 'The LRN must be 12 digits.'),
-  lastName: z.string().trim().min(1, 'The surname is required.').max(80),
-  firstName: z.string().trim().min(1, 'The first name is required.').max(80),
-  middleName: optionalText(80),
-  nameExt: optionalText(16),
+  lastName: requiredName('surname', 80),
+  firstName: requiredName('first name', 80),
+  middleName: optionalName('middle name', 80),
+  nameExt: optionalName('name extension', 16),
   sex: z.enum(['M', 'F']),
   birthDate: isoDay,
   healthNotes: optionalText(2000),

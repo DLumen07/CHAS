@@ -4,10 +4,9 @@
    screens put the sheets they want issued into `#print-root` (see
    `index.html`), then call one of these:
 
-     - `printPaper()` opens the system print dialog. The user can of course
-       pick "Microsoft Print to PDF" there too; the dedicated route below
-       exists because on a school workstation that driver is not always
-       installed, and because a save dialog is one step instead of four.
+     - `printPaper()` opens CHAS's print window: the pages as they will
+       print, the printer and the number of copies (since 2026-10-22; it
+       was the Windows dialog, which shows no preview for this app).
 
      - `savePdf()` asks the main process for a real PDF through
        `chas:print:pdf`. Chromium lays out the page with the print stylesheet
@@ -26,6 +25,7 @@ export type PdfResult =
 
 interface PrintBridge {
   pdf: (opts: { suggestedName: string; title?: string }) => Promise<PdfResult>
+  paper?: (opts: { title?: string }) => Promise<PrintResult>
 }
 
 const bridge = (): PrintBridge | undefined =>
@@ -48,8 +48,28 @@ export async function savePdf(suggestedName: string, title?: string): Promise<Pd
   }
 }
 
-export function printPaper(): void {
-  window.print()
+export type PrintResult =
+  | { ok: true }
+  | { ok: false; reason: 'canceled' }
+  | { ok: false; reason: 'error'; message: string }
+
+/** Prints #print-root. In the app this opens CHAS's print window: a preview
+    of the pages beside the printer and copies (electron/print-preview.cjs),
+    because the Windows dialog cannot preview an Electron page. It resolves
+    once the pages are sent or the window is closed. In a plain browser it is
+    the browser's own print dialog, which has a preview. `title` names what
+    is printed: "SF8", "Advisory slips". */
+export async function printPaper(title?: string): Promise<PrintResult> {
+  const b = bridge()
+  if (!b?.paper) {
+    window.print()
+    return { ok: true }
+  }
+  try {
+    return await b.paper({ title })
+  } catch (err) {
+    return { ok: false, reason: 'error', message: String(err) }
+  }
 }
 
 /** `CHAS-slips-2026-08-10.pdf`, or the stub ID when it is a single learner. */
