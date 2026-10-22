@@ -219,7 +219,7 @@ export default function Learners() {
   /* The card whose quick look is open. */
   const [peek, setPeek] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState(false)
-  /* The Add learner window switched to importing a spreadsheet. */
+  /* The Add learner window switched to importing an SF1. */
   const [importing, setImporting] = useState(false)
 
   /* ?learner=<id> opens the record; consumed once. */

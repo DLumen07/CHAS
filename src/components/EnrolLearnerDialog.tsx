@@ -42,6 +42,7 @@ import {
 } from '../lib/api'
 import { refresh } from '../lib/server-records'
 import { formatDate } from '../lib/dates'
+import { nameError } from '../lib/names'
 
 /* Registering a learner.
 
@@ -76,6 +77,8 @@ const STEP_OF: Record<string, number> = {
   lrn: 0,
   firstName: 0,
   lastName: 0,
+  middleName: 0,
+  nameExt: 0,
   birthDate: 0,
   sex: 0,
   sectionId: 1,
@@ -98,7 +101,7 @@ export function EnrolLearnerDialog({
   onDone: () => void
   onView: (learnerId: string) => void
   onAssess: (learnerId: string) => void
-  /** Swaps this form for the spreadsheet import. */
+  /** Swaps this form for the SF1 import. */
   onImport: () => void
 }) {
   /* --- 1. Learner ------------------------------------------------------- */
@@ -209,7 +212,11 @@ export function EnrolLearnerDialog({
 
     if (!/^\d{12}$/.test(lrn)) e.lrn = 'The LRN must be 12 digits.'
     if (!lastName.trim()) e.lastName = 'The surname is required.'
+    else if (nameError(lastName, 'surname')) e.lastName = nameError(lastName, 'surname')
     if (!firstName.trim()) e.firstName = 'The first name is required.'
+    else if (nameError(firstName, 'first name')) e.firstName = nameError(firstName, 'first name')
+    if (nameError(middleName, 'middle name')) e.middleName = nameError(middleName, 'middle name')
+    if (nameError(nameExt, 'extension')) e.nameExt = nameError(nameExt, 'extension')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) e.birthDate = 'Enter the date of birth.'
     else if (birthDate > TODAY) e.birthDate = 'That date is in the future.'
     else if (age && age.months > 300) e.birthDate = 'Enter a valid date of birth.'
@@ -441,7 +448,7 @@ export function EnrolLearnerDialog({
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-medium text-navy-700 shadow-[inset_0_0_0_1px_var(--color-line)] transition-colors duration-100 hover:bg-wash hover:text-navy-900"
             >
               <FileArrowUp size={15} weight="bold" />
-              Import from spreadsheet
+              Import from SF1
             </button>
           )}
           <button
@@ -507,12 +514,18 @@ export function EnrolLearnerDialog({
                 onChange={setLastName}
                 error={errors.lastName}
               />
-              <TextInput label="Middle name" value={middleName} onChange={setMiddleName} />
+              <TextInput
+                label="Middle name"
+                value={middleName}
+                onChange={setMiddleName}
+                error={errors.middleName}
+              />
               <TextInput
                 label="Extension"
                 value={nameExt}
                 onChange={(v) => setNameExt(v.slice(0, 16))}
                 placeholder="Jr., III"
+                error={errors.nameExt}
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

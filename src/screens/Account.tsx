@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Buildings, FirstAidKit, Key, LockKey, Warning } from '@phosphor-icons/react'
-import { Field, cx } from '@/components/ui'
+import { PasswordField, cx } from '@/components/ui'
 import { Modal, ModalCloseButton, ModalContent, ModalDescription, ModalTitle } from '@/components/primitives'
 import { RecoveryCodesDialog, useRecoveryCodes } from '@/components/RecoverySettings'
 import { toast } from '@/components/toast'
@@ -239,27 +239,24 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           </div>
 
           <div className="mt-5 space-y-4">
-            <Field
+            <PasswordField
               label="Current password"
-              type="password"
               autoComplete="current-password"
               autoFocus
               value={current}
               inputClassName={FIELD}
               onChange={(e) => setCurrent(e.target.value)}
             />
-            <Field
+            <PasswordField
               label="New password"
-              type="password"
               autoComplete="new-password"
               placeholder="At least twelve characters"
               value={next}
               inputClassName={FIELD}
               onChange={(e) => setNext(e.target.value)}
             />
-            <Field
+            <PasswordField
               label="Confirm new password"
-              type="password"
               autoComplete="new-password"
               value={confirm}
               inputClassName={FIELD}

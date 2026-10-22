@@ -1,5 +1,6 @@
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes } from 'react'
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { BAND_COLOR } from '@/lib/nutrition'
@@ -242,6 +243,39 @@ export const Field = forwardRef<
         hint && <span className="mt-1 block text-[11px] text-muted">{hint}</span>
       )}
     </label>
+  )
+})
+
+/* A password box with a Show / Hide button inside its right edge. Every
+   form that sets a password uses it for both the new password and its
+   confirmation (2026-10-22, the user's request), each with its own toggle so
+   one can be checked against the other. Hidden to start: the head's forms
+   used to show the first password in plain text, and a screen at the clinic
+   desk is often in view of others. */
+export const PasswordField = forwardRef<
+  HTMLInputElement,
+  Omit<Parameters<typeof Field>[0], 'type' | 'trailing' | 'ref'>
+>(function PasswordField({ inputClassName, ...rest }, ref) {
+  const [shown, setShown] = useState(false)
+  return (
+    <Field
+      {...rest}
+      ref={ref}
+      type={shown ? 'text' : 'password'}
+      spellCheck={false}
+      inputClassName={cx(inputClassName, 'pr-11')}
+      trailing={
+        <button
+          type="button"
+          onClick={() => setShown((v) => !v)}
+          aria-label={shown ? 'Hide password' : 'Show password'}
+          aria-pressed={shown}
+          className="mr-0.5 grid size-8 place-items-center rounded-full text-muted transition-colors duration-100 hover:bg-navy-50 hover:text-navy-800"
+        >
+          {shown ? <EyeSlash size={16} /> : <Eye size={16} />}
+        </button>
+      }
+    />
   )
 })
 

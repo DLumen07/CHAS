@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, LockKey, Warning } from '@phosphor-icons/react'
-import { AccentButton, Field, cx } from '../components/ui'
+import { AccentButton, PasswordField, cx } from '../components/ui'
 import { ApiError, OfflineError, endpoints } from '../lib/api'
 
 /* A new password, inside the sign-in card, before anything else opens.
@@ -59,9 +59,8 @@ export default function SetNewPassword({
       </p>
 
       <form className="mt-5 space-y-4" onSubmit={submit} noValidate>
-        <Field
+        <PasswordField
           label="New password"
-          type="password"
           placeholder="At least twelve characters"
           autoComplete="new-password"
           autoFocus
@@ -70,9 +69,8 @@ export default function SetNewPassword({
           inputClassName={fieldClass}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Field
+        <PasswordField
           label="Confirm new password"
-          type="password"
           placeholder="Type it again"
           autoComplete="new-password"
           value={confirm}

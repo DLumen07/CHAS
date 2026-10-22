@@ -1,11 +1,13 @@
-/* Reading a class list from a spreadsheet.
+/* Reading a class list from an SF1 (School Form 1, School Register).
 
-   WHAT IS ACCEPTED. An .xlsx workbook (its first sheet) or a .csv file. The
-   SF1 that LIS exports is the case this is written for: a few title rows, a
-   header row with "LRN", a name column written "LAST, FIRST, MIDDLE", sex and
-   birth date - then one row per learner, with "TOTAL" rows between the boys
-   and the girls. A plain sheet with separate Last name / First name columns
-   works too.
+   WHAT IS ACCEPTED. The SF1 as an .xlsx workbook, its first sheet. Both the
+   blank DepEd form the app hands out (public/sf1-school-register.xlsx) and
+   the SF1 that LIS exports have the same shape: title rows with School Year,
+   Grade Level and Section, a header row with "LRN", a name column written
+   "LAST, FIRST, MIDDLE", sex and birth date - then one row per learner,
+   with "TOTAL" rows between the boys and the girls, and the legend of
+   remark codes below the last one. Since 2026-10-22 the SF1 is the only
+   file taken; the CSV template it replaced is gone.
 
    NO LIBRARY. An .xlsx file is a zip of XML. The browser already has the two
    things needed to read one - DecompressionStream for the zip and DOMParser
@@ -19,6 +21,7 @@
    the nurse exactly what will and will not be added. */
 
 import type { ImportLearnerRow } from './api'
+import { isValidName } from './names'
 
 /** A learner as read; `sex` is blank when the cell could not be read. */
 export type ClassListLearner = Omit<ImportLearnerRow, 'sex'> & { sex: 'M' | 'F' | '' }
@@ -34,12 +37,47 @@ export interface ClassListRow {
 /** The rows of the file's first sheet, as text. */
 export async function readSpreadsheet(file: File): Promise<string[][]> {
   const name = file.name.toLowerCase()
-  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(await file.text())
   if (name.endsWith('.xlsx')) return readXlsx(new Uint8Array(await file.arrayBuffer()))
   if (name.endsWith('.xls')) {
-    throw new Error('Old .xls files cannot be read. Save the file as .xlsx or .csv and try again.')
+    throw new Error('Old .xls files cannot be read. Open the SF1 in Excel, save it as .xlsx and try again.')
   }
-  throw new Error('Choose an .xlsx or .csv file.')
+  throw new Error('Choose the SF1 as an Excel (.xlsx) file.')
+}
+
+/** What the SF1's title rows say the list is for. Blank when not filled in. */
+export interface Sf1Heading {
+  schoolYear: string
+  gradeLevel: string
+  section: string
+}
+
+/* Each title is its own cell with the value in the next filled cell to its
+   right ("Grade Level" | | "Grade 7"). Some copies type both into one cell,
+   "Grade Level: 7", which is read too. */
+export function readSf1Heading(rows: string[][]): Sf1Heading {
+  const out: Sf1Heading = { schoolYear: '', gradeLevel: '', section: '' }
+  const LABELS: [keyof Sf1Heading, RegExp][] = [
+    ['schoolYear', /^school\s*year\b/i],
+    ['gradeLevel', /^grade\s*level\b/i],
+    ['section', /^section\b/i],
+  ]
+  const isLabel = (v: string) =>
+    /^(school\s*(id|name|year)|region|division|district|grade\s*level|section)\b/i.test(v.trim())
+  for (const row of rows.slice(0, 8)) {
+    row.forEach((raw, i) => {
+      const v = (raw ?? '').trim()
+      for (const [key, re] of LABELS) {
+        if (!re.test(v) || out[key]) continue
+        const inline = v.replace(re, '').replace(/^[\s:]+/, '').trim()
+        if (inline) out[key] = inline
+        else {
+          const next = row.slice(i + 1).map((c) => (c ?? '').trim()).find(Boolean) ?? ''
+          if (next && !isLabel(next)) out[key] = next
+        }
+      }
+    })
+  }
+  return out
 }
 
 /* --- Finding the learners ---------------------------------------------- */
@@ -87,16 +125,19 @@ export function toClassList(rows: string[][]): ClassListRow[] {
     }
   }
   if (head < 0) {
-    throw new Error('No header row was found. The file needs an LRN column and a name column.')
+    throw new Error('This file is not an SF1. The LRN and Name columns were not found.')
   }
-  if (cols.sex === undefined) throw new Error('The file has no Sex column.')
-  if (cols.birth === undefined) throw new Error('The file has no Birth date column.')
+  if (cols.sex === undefined) throw new Error('The SF1 has no Sex column.')
+  if (cols.birth === undefined) throw new Error('The SF1 has no Birth date column.')
 
   const out: ClassListRow[] = []
   const seen = new Map<string, number>()
 
   for (let r = head + 1; r < rows.length; r++) {
     const row = rows[r]
+    /* The legend of remark codes and the signatures sit under the last
+       learner. Nothing below them is a learner. */
+    if (row.some((v) => /list and code of indicators|prepared by|certified correct/i.test(v ?? ''))) break
     const cell = (c: Column) => (cols[c] === undefined ? '' : (row[cols[c]!] ?? '').trim())
 
     const rawLrn = cell('lrn')
@@ -130,6 +171,12 @@ export function toClassList(rows: string[][]): ClassListRow[] {
     else if (!/^\d{12}$/.test(lrn)) problem = 'The LRN must be 12 digits.'
     else if (seen.has(lrn)) problem = `Same LRN as row ${seen.get(lrn)}.`
     else if (!learner.lastName || !learner.firstName) problem = 'The name is incomplete.'
+    else if (
+      [learner.lastName, learner.firstName, learner.middleName, learner.nameExt].some(
+        (n) => n && !isValidName(n),
+      )
+    )
+      problem = 'The name can only have letters, spaces, hyphens, apostrophes and periods.'
     else if (!sex) problem = 'Sex must be M or F.'
     else if (!birthDate) problem = 'The birth date cannot be read.'
     else if (birthDate > todayIso()) problem = 'The birth date is in the future.'
@@ -240,46 +287,6 @@ function toIsoDate(s: string): string | null {
   return null
 }
 
-/* --- CSV ----------------------------------------------------------------- */
-
-function parseCsv(text: string): string[][] {
-  const src = text.replace(/^﻿/, '')
-  const firstLine = src.slice(0, src.indexOf('\n') >>> 0)
-  /* Excel set to a Philippine or European locale may save with semicolons. */
-  const delim = [',', ';', '\t'].reduce((a, b) =>
-    firstLine.split(b).length > firstLine.split(a).length ? b : a,
-  )
-  const rows: string[][] = []
-  let row: string[] = []
-  let cell = ''
-  let quoted = false
-  for (let i = 0; i < src.length; i++) {
-    const ch = src[i]
-    if (quoted) {
-      if (ch === '"' && src[i + 1] === '"') {
-        cell += '"'
-        i++
-      } else if (ch === '"') quoted = false
-      else cell += ch
-    } else if (ch === '"') quoted = true
-    else if (ch === delim) {
-      row.push(cell)
-      cell = ''
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && src[i + 1] === '\n') i++
-      row.push(cell)
-      rows.push(row)
-      row = []
-      cell = ''
-    } else cell += ch
-  }
-  if (cell || row.length) {
-    row.push(cell)
-    rows.push(row)
-  }
-  return rows
-}
-
 /* --- XLSX ---------------------------------------------------------------- */
 
 async function readXlsx(bytes: Uint8Array): Promise<string[][]> {
@@ -385,9 +392,4 @@ function readZip(bytes: Uint8Array): Map<string, () => Promise<Uint8Array>> {
     })
   }
   return entries
-}
-
-/** A blank class list with the columns this reader looks for. */
-export function templateCsv(): string {
-  return '﻿LRN,Last name,First name,Middle name,Extension,Sex,Birth date (mm/dd/yyyy)\r\n'
 }

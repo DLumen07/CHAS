@@ -5,22 +5,57 @@ import { Fieldset, REQ } from './form'
 import { ModalContent, ModalDescription, ModalTitle } from './primitives'
 import { toast } from './toast'
 import { ApiError, endpoints, type ApiEnrolmentOptions, type ImportLearnerRow } from '../lib/api'
-import { readSpreadsheet, templateCsv, toClassList, type ClassListRow } from '../lib/class-list'
+import { readSf1Heading, readSpreadsheet, toClassList, type ClassListRow, type Sf1Heading } from '../lib/class-list'
 import { refresh } from '../lib/server-records'
 import { useRoster } from '../lib/records'
 import { formatDate } from '../lib/dates'
 
-/* Adding a whole class from a spreadsheet.
+/* Adding a whole class from its SF1.
 
    One page: the class, the file, then a preview of every row the file holds
    with what will happen to it. Nothing is saved until "Import" is pressed,
    and only the rows marked Ready are sent. The class is chosen once for the
-   whole file, as an SF1 is one class.
+   whole file, as an SF1 is one class. When the form's Grade Level and
+   Section name a class on file, that class is picked on reading it; picking
+   another one afterwards shows a warning rather than being refused, as a
+   section may have been renamed since the form was printed.
+
+   The blank form offered for download is the DepEd SF1 itself
+   (public/sf1-school-register.xlsx), so the nurse fills in the same sheet
+   the adviser already keeps.
 
    Immunization is not part of a class list, so imported learners start with
    no card on file; the note above the button says where to add it. */
 
 type Status = 'ready' | 'registered' | 'problem'
+
+type Section = ApiEnrolmentOptions['sections'][number]
+
+const SF1_TEMPLATE = `${import.meta.env.BASE_URL}sf1-school-register.xlsx`
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/** "Grade 7", "7", "Kinder" against the class's year. */
+function sameGrade(form: string, s: Section): boolean {
+  const n = form.match(/\d+/)?.[0]
+  if (n) return Number(n) === s.gradeLevel || norm(s.gradeName).split(' ').includes(n)
+  return norm(form) === norm(s.gradeName)
+}
+
+/** The class the SF1's title rows name, or null when none matches. The
+    section name decides; the grade breaks a tie, and stands alone when its
+    year has a single class. */
+function classOnForm(h: Sf1Heading, sections: Section[]): Section | null {
+  const named = h.section ? sections.filter((s) => norm(s.name) === norm(h.section)) : []
+  if (named.length === 1) return named[0]
+  const inGrade = h.gradeLevel ? (named.length ? named : sections).filter((s) => sameGrade(h.gradeLevel, s)) : []
+  if (inGrade.length === 1) return inGrade[0]
+  return named[0] ?? null
+}
+
+function formLabel(h: Sf1Heading): string {
+  return [h.gradeLevel, h.section].filter(Boolean).join(' · ')
+}
 
 export function ImportLearnersDialog({
   section,
@@ -35,6 +70,7 @@ export function ImportLearnersDialog({
   const [sectionId, setSectionId] = useState('')
   const [fileName, setFileName] = useState<string | null>(null)
   const [rows, setRows] = useState<ClassListRow[] | null>(null)
+  const [heading, setHeading] = useState<Sf1Heading | null>(null)
   const [reading, setReading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -71,12 +107,18 @@ export function ImportLearnersDialog({
     setFailure(null)
     setReading(true)
     try {
-      const list = toClassList(await readSpreadsheet(file))
-      if (list.length === 0) throw new Error('No learners were found in the file.')
+      const sheet = await readSpreadsheet(file)
+      const list = toClassList(sheet)
+      if (list.length === 0) throw new Error('No learners were found in the SF1.')
+      const h = readSf1Heading(sheet)
+      const match = options ? classOnForm(h, options.sections) : null
+      if (match) setSectionId(match.id)
       setRows(list)
+      setHeading(h)
       setFileName(file.name)
     } catch (err) {
       setRows(null)
+      setHeading(null)
       setFileName(null)
       setFailure(err instanceof Error ? err.message : 'The file could not be read.')
     } finally {
@@ -93,12 +135,10 @@ export function ImportLearnersDialog({
   }
 
   function downloadTemplate() {
-    const url = URL.createObjectURL(new Blob([templateCsv()], { type: 'text/csv' }))
     const a = document.createElement('a')
-    a.href = url
-    a.download = 'class-list-template.csv'
+    a.href = SF1_TEMPLATE
+    a.download = 'School Form 1 (SF1) School Register.xlsx'
     a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   async function save() {
@@ -127,7 +167,12 @@ export function ImportLearnersDialog({
     }
   }
 
-  const className = options?.sections.find((s) => s.id === sectionId)?.name ?? ''
+  const chosen = options?.sections.find((s) => s.id === sectionId)
+  const className = chosen?.name ?? ''
+  /* The form names a class, and it is not the one picked. */
+  const onForm = heading && options ? classOnForm(heading, options.sections) : null
+  const mismatch =
+    heading && formLabel(heading) && chosen && onForm?.id !== chosen.id ? formLabel(heading) : null
 
   /* --- Imported --------------------------------------------------------- */
 
@@ -175,7 +220,7 @@ export function ImportLearnersDialog({
               Import learners
             </ModalTitle>
             <ModalDescription className="mt-1 text-[12.5px] text-muted">
-              Add a class from a spreadsheet.
+              Add a class from its SF1 (School Register).
             </ModalDescription>
           </div>
           <button
@@ -216,7 +261,7 @@ export function ImportLearnersDialog({
         <input
           ref={input}
           type="file"
-          accept=".xlsx,.csv"
+          accept=".xlsx"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -225,7 +270,7 @@ export function ImportLearnersDialog({
         />
 
         <div className="mt-5">
-          <Fieldset label={<>File{REQ}</>}>
+          <Fieldset label={<>SF1{REQ}</>}>
             {rows ? (
               <div className="flex items-center gap-3 rounded-[12px] bg-wash px-4 py-3">
                 <FileText size={20} weight="duotone" className="shrink-0 text-navy-700" />
@@ -242,6 +287,12 @@ export function ImportLearnersDialog({
                       </>
                     )}
                   </p>
+                  {mismatch && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] font-medium text-[#8a5a00]">
+                      <Warning size={13} weight="fill" className="shrink-0" />
+                      The SF1 is for {mismatch}. Check the class.
+                    </p>
+                  )}
                 </div>
                 <Button onClick={() => input.current?.click()} disabled={busy || reading}>
                   Change file
@@ -267,11 +318,11 @@ export function ImportLearnersDialog({
                   onClick={() => input.current?.click()}
                   disabled={reading}
                 >
-                  {reading ? 'Reading…' : 'Choose file'}
+                  {reading ? 'Reading…' : 'Choose SF1'}
                 </Button>
                 <p className="mt-3 max-w-[52ch] text-[12px] leading-relaxed text-muted">
-                  Excel (.xlsx) or CSV. The SF1 from LIS can be used as it is. The file needs LRN, name, sex
-                  and birth date columns.
+                  The class's SF1 as an Excel (.xlsx) file, from LIS or filled in by hand. LRN, name, sex and
+                  birth date are read.
                 </p>
                 <button
                   type="button"
@@ -279,7 +330,7 @@ export function ImportLearnersDialog({
                   className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium text-navy-700 hover:bg-wash hover:text-navy-900"
                 >
                   <DownloadSimple size={13} weight="bold" />
-                  Download a blank template
+                  Download a blank SF1
                 </button>
               </div>
             )}

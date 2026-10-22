@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Key, LockKey, User, Warning } from '@phosphor-icons/react'
-import { AccentButton, Field, cx } from '../components/ui'
+import { AccentButton, Field, PasswordField, cx } from '../components/ui'
 import { ApiError, OfflineError, endpoints } from '../lib/api'
 
 /* Forgot password, inside the sign-in card.
@@ -97,9 +97,8 @@ export default function ForgotPassword({
           inputClassName={cx(fieldClass, 'font-mono uppercase')}
           onChange={(e) => setCode(e.target.value)}
         />
-        <Field
+        <PasswordField
           label="New password"
-          type="password"
           placeholder="At least twelve characters"
           autoComplete="new-password"
           value={password}
@@ -107,9 +106,8 @@ export default function ForgotPassword({
           inputClassName={fieldClass}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Field
+        <PasswordField
           label="Confirm new password"
-          type="password"
           placeholder="Type it again"
           autoComplete="new-password"
           value={confirm}
